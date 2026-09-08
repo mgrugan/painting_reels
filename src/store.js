@@ -23,7 +23,7 @@ export const DEFAULTS = {
   fontFamily: '700 %spx "Helvetica Neue", Helvetica, Arial, sans-serif',
   fontSize: 52,
   capPos: 'auto',
-  watermark: '',
+  watermark: '@explainingpaintings',
   musicVol: 35,
 };
 
