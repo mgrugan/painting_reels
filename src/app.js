@@ -7,7 +7,7 @@ import { DEFAULTS, loadSettings, saveSettings, loadApiKey, rememberApiKey, forge
 import { estimateCost, testKey, AnthropicError } from './anthropic.js';
 import { writeScript, estimateTokens } from './script.js';
 import { loadImage, toModelImage, readFileAsDataUrl } from './images.js';
-import { buildTimeline, drawFrame, drawCropEditor, paintingFit, toPaintingSpace } from './renderer.js';
+import { buildTimeline, drawFrame, drawCropEditor, drawSafeZone, paintingFit, toPaintingSpace } from './renderer.js';
 import { record, decodeAudioFile, downloadBlob, isSupported, outputFormat } from './recorder.js';
 
 const $ = (id) => document.getElementById(id);
@@ -40,7 +40,7 @@ const CONTROLS = {
   model: 'value', effort: 'value', voice: 'value', beats: 'number', secs: 'number',
   strictFacts: 'checked', res: 'value', fps: 'value', motion: 'number',
   showTitleCard: 'checked', fontFamily: 'value', fontSize: 'number', capPos: 'value',
-  watermark: 'value', musicVol: 'number',
+  showSafeZone: 'checked', watermark: 'value', musicVol: 'number',
 };
 
 function applySettingsToForm() {
@@ -169,6 +169,7 @@ function drawPoster() {
   const dw = img.naturalWidth * k;
   const dh = img.naturalHeight * k;
   ctx.drawImage(img, (CW - dw) / 2, (CH - dh) / 2, dw, dh);
+  if (state.settings.showSafeZone) drawSafeZone(ctx, { width: CW, height: CH });
   $('phoneEmpty').hidden = true;
 }
 
@@ -448,7 +449,8 @@ function rebuildTimeline() {
 function seek(time) {
   if (!state.timeline || state.cropping) return;
   state.playHead = Math.min(state.timeline.duration, Math.max(0, time));
-  drawFrame(ctx, state.timeline, state.playHead, false);
+  drawFrame(ctx, state.timeline, state.playHead);
+  if (state.settings.showSafeZone) drawSafeZone(ctx, state.timeline.opts);
   $('scrub').value = String(Math.round((state.playHead / state.timeline.duration) * 1000));
   updateTimecode();
   $('phoneEmpty').hidden = true;

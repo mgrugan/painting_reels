@@ -61,9 +61,15 @@ the painting again, with its title, artist and collection. Holding the title bac
 until the end is the point of the format.
 
 Captions place themselves. The camera is always built around the subject, so the
-middle of the frame is exactly where text must not go; each caption measures the
-clear space above and below its subject and takes the roomier side. You can
-override that per reel in the sidebar.
+middle of the frame is exactly where text must not go; the crop offsets the
+subject to open a band, and each caption takes whichever side is genuinely
+clear. You can override that per reel in the sidebar.
+
+Everything that is not the picture — captions, watermark, title card — stays
+inside the title-safe area: 120px in from each side, 250px off the top and 380px
+off the bottom of a 1080 × 1920 frame, which is where Instagram and TikTok lay
+their own controls. **Show safe zone in the preview** draws the boundary while
+you work; it is never rendered into the file.
 
 ## Cost
 

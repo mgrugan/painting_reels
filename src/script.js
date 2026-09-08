@@ -26,7 +26,9 @@ const BEAT = {
   properties: {
     text: {
       type: 'string',
-      description: 'The caption burned onto the screen for this beat. 8-28 words.',
+      description:
+        'The caption burned onto the screen for this beat. 8-28 words, ' +
+        'or 6-18 for the hook.',
     },
     subject: {
       type: 'string',
@@ -88,15 +90,32 @@ of details, slowly pushing in or drifting across each one. A line of text sits o
 the image for the whole of each shot. There is no voice-over and no music you can
 rely on: the text carries everything.
 
-WHAT MAKES ONE GOOD
-- The first line is the whole game. It must make someone stop scrolling without
-  promising anything the painting cannot deliver. Never open with the title, the
-  artist, the date, or "This painting". Open on a detail, a contradiction, or the
-  human situation. It should read like the middle of a sentence someone is already
-  telling you.
-- Then one detail per beat, in an order that builds. Each beat should show the
-  viewer something they would not have found on their own, and each should change
-  what the previous beat meant.
+THE HOOK
+The first line runs over the whole painting and decides whether anyone sees the
+rest. Write it last, once you know what the strongest thing in the reel is, and
+then put that thing first.
+
+It has to do one job: make someone need the next sentence. The reliable way is
+to state something concrete and true about the picture that does not resolve.
+
+- 6 to 18 words. It has to be read in about two seconds.
+- Lead with a specific noun from the painting - a hand, a glove, a bird, a
+  letter - not with "this painting", "this detail", "look closely", "at first
+  glance", "what you are about to see", or any promise about how amazing it is.
+- Say something that raises a question the painting can actually answer, and do
+  not answer it. Not a riddle and not a tease: a plain fact that is strange
+  enough to need explaining. "There is a glove on the floor and only one person
+  in this room can leave" beats "This painting hides a dark secret".
+- Present tense. No question marks. No "you won't believe", no "here's why",
+  no numbers of things, no addressing the viewer as "guys".
+- Test it: if the line would work as the opening of any other reel about any
+  other painting, it is too vague. Rewrite it around something only this
+  painting contains.
+
+THE REST
+- One detail per beat, in an order that builds. Each beat should show the viewer
+  something they would not have found on their own, and each should change what
+  the previous beat meant.
 - Withhold the title and artist until the very end. That is what the closing card
   is for.
 - The payoff must land. Prefer a documented fact that recontextualises the whole
@@ -179,7 +198,8 @@ Write the script for this painting.
 
 Voice: ${VOICES[voice] || VOICES.plain}
 
-Length: a hook, then ${beatCount} beats, then a payoff. Aim for about ${seconds} seconds
+Length: a hook, then ${beatCount} beats, then a payoff. Write the beats and the
+payoff first, then go back and write the hook out of the best of them. Aim for about ${seconds} seconds
 per beat; give shorter beats less text and longer beats more, and set "seconds" per beat
 so the text is comfortably readable at roughly 2.5 words per second with a moment to spare.
 

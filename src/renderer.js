@@ -17,6 +17,40 @@ const CAPTION_MAX_HEIGHT = 0.34;
 const SUBJECT_LIFT = 0.11;
 
 /**
+ * The title-safe area, as fractions of the frame.
+ *
+ * Instagram and TikTok lay their own furniture over the edges of a reel — the
+ * caption, handle and buttons across the bottom, the profile and sound strip at
+ * the top, the action rail down the right. Anything outside these insets is
+ * liable to be sat on. Taken from a 1080 x 1920 template: 120px either side,
+ * 250px off the top, 380px off the bottom.
+ */
+const SAFE = {
+  left: 120 / 1080,
+  right: 120 / 1080,
+  top: 250 / 1920,
+  bottom: 380 / 1920,
+};
+
+/** The safe rectangle in canvas pixels. */
+function safeArea(CW, CH) {
+  const x = CW * SAFE.left;
+  const y = CH * SAFE.top;
+  return { x, y, w: CW * (1 - SAFE.left - SAFE.right), h: CH * (1 - SAFE.top - SAFE.bottom) };
+}
+
+/** Height of the strip at the foot of the safe area kept clear for the handle. */
+function watermarkStrip(opts) {
+  return opts.watermark ? 18 * (opts.height / 1280) * 2.1 : 0;
+}
+
+/** The safe area minus anything already spoken for. */
+function captionArea(opts) {
+  const safe = safeArea(opts.width, opts.height);
+  return { ...safe, h: safe.h - watermarkStrip(opts) };
+}
+
+/**
  * @param {object} script  from writeScript()
  * @param {HTMLImageElement} img
  * @param {object} opts    { width, height, motion, showTitleCard, painting }
@@ -51,7 +85,7 @@ export function buildTimeline(script, img, opts) {
       captionPos:
         opts.capPos && opts.capPos !== 'auto'
           ? opts.capPos
-          : placeCaption(subject, lerpRect(from, to, 0.5), CW, CH),
+          : placeCaption(subject, lerpRect(from, to, 0.5), CW, CH, opts),
     };
     t = shot.end;
     return shot;
@@ -222,11 +256,13 @@ function projectRect(rect, view, CW, CH) {
  * the subject and take the roomier side; only fall back to the centre when the
  * subject fills the frame top to bottom and there is nowhere better.
  */
-function placeCaption(subject, view, CW, CH) {
+function placeCaption(subject, view, CW, CH, opts) {
+  const safe = captionArea(opts);
   const box = projectRect(subject, view, CW, CH);
-  const above = Math.max(0, box.y);
-  const below = Math.max(0, CH - (box.y + box.h));
-  const needed = CH * 0.2;
+  // Space is only useful if a caption is allowed to sit in it.
+  const above = Math.max(0, Math.min(box.y, safe.y + safe.h) - safe.y);
+  const below = Math.max(0, safe.y + safe.h - Math.max(box.y + box.h, safe.y));
+  const needed = safe.h * 0.26;
 
   // A subject that fills the frame — the opening full-painting shot, usually —
   // has no clear band at all. The lower third is the least destructive place to
@@ -257,26 +293,27 @@ function drawCaption(ctx, text, position, opts) {
 
   const CW = opts.width;
   const CH = opts.height;
+  const safe = captionArea(opts);
   const scale = CH / 1280;
-  let size = (opts.fontSize || 44) * scale;
-  const maxWidth = CW * 0.84;
+  let size = (opts.fontSize || 38) * scale;
+  const maxWidth = safe.w;
 
   // A long beat shrinks rather than growing a block that swallows the picture.
   let lines = wrap(ctx, text, maxWidth, captionFont(opts, size));
-  while (lines.length * size * 1.22 > CH * CAPTION_MAX_HEIGHT && size > 24 * scale) {
+  while (lines.length * size * 1.22 > safe.h * CAPTION_MAX_HEIGHT && size > 22 * scale) {
     size *= 0.94;
     lines = wrap(ctx, text, maxWidth, captionFont(opts, size));
   }
 
   const lineHeight = size * 1.22;
   const blockHeight = lines.length * lineHeight;
-  const margin = CH * 0.055;
 
   let top;
-  if (position === 'top') top = margin + CH * 0.02;
-  else if (position === 'lower') top = CH - margin - CH * 0.055 - blockHeight;
-  else top = (CH - blockHeight) / 2;
-  top = Math.min(CH - blockHeight - margin, Math.max(margin, top));
+  if (position === 'top') top = safe.y;
+  else if (position === 'lower') top = safe.y + safe.h - blockHeight;
+  else top = safe.y + (safe.h - blockHeight) / 2;
+  // Never leave the safe area, even for a block too tall to fit inside it.
+  top = Math.max(safe.y, Math.min(safe.y + safe.h - blockHeight, top));
 
   ctx.font = captionFont(opts, size);
   ctx.textAlign = 'center';
@@ -289,11 +326,12 @@ function drawCaption(ctx, text, position, opts) {
   ctx.shadowBlur = size * 0.35;
   ctx.strokeStyle = '#000';
   ctx.lineWidth = size * 0.17;
-  lines.forEach((line, i) => ctx.strokeText(line, CW / 2, top + i * lineHeight));
+  const cx = safe.x + safe.w / 2;
+  lines.forEach((line, i) => ctx.strokeText(line, cx, top + i * lineHeight));
   ctx.restore();
 
   ctx.fillStyle = '#fff';
-  lines.forEach((line, i) => ctx.fillText(line, CW / 2, top + i * lineHeight));
+  lines.forEach((line, i) => ctx.fillText(line, cx, top + i * lineHeight));
 }
 
 function wrap(ctx, text, maxWidth, font) {
@@ -317,14 +355,15 @@ function wrap(ctx, text, maxWidth, font) {
 
 function drawWatermark(ctx, opts) {
   const scale = opts.height / 1280;
+  const safe = safeArea(opts.width, opts.height);
   ctx.save();
-  ctx.font = captionFont(opts, 19 * scale);
+  ctx.font = captionFont(opts, 18 * scale);
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'bottom';
   ctx.fillStyle = 'rgba(255,255,255,0.42)';
   ctx.shadowColor = 'rgba(0,0,0,0.45)';
   ctx.shadowBlur = 6 * scale;
-  ctx.fillText(opts.watermark, opts.width / 2, opts.height * 0.9);
+  ctx.fillText(opts.watermark, safe.x + safe.w / 2, safe.y + safe.h);
   ctx.restore();
 }
 
@@ -334,32 +373,53 @@ function drawTitleCard(ctx, timeline, shot) {
   const CH = opts.height;
   const scale = CH / 1280;
 
-  ctx.save();
+  // captionArea, not safeArea, so the credit line clears the watermark.
+  const safe = captionArea(opts);
+  const cx = safe.x + safe.w / 2;
 
-  const boxTop = CH * 0.2;
-  const boxHeight = CH * 0.56;
-  const k = Math.min((CW * 0.82) / img.naturalWidth, boxHeight / img.naturalHeight);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  // A long title wraps to two lines, then shrinks, rather than running off the
+  // edge of the frame.
+  let titleSize = 38 * scale;
+  let titleLines = wrap(ctx, shot.painting.title, safe.w, captionFont(opts, titleSize));
+  while (titleLines.length > 2 && titleSize > 22 * scale) {
+    titleSize *= 0.93;
+    titleLines = wrap(ctx, shot.painting.title, safe.w, captionFont(opts, titleSize));
+  }
+
+  const bySize = 26 * scale;
+  const creditSize = 20 * scale;
+  const by = [shot.painting.artist, shot.painting.year].filter(Boolean).join(', ');
+
+  const titleHeight = titleLines.length * titleSize * 1.2;
+  const headerHeight = titleHeight + (by ? bySize * 1.7 : titleSize * 0.5);
+  const footerHeight = shot.painting.museum ? creditSize * 2.4 : 0;
+
+  const boxTop = safe.y + headerHeight;
+  const boxHeight = safe.h - headerHeight - footerHeight;
+  const k = Math.min(safe.w / img.naturalWidth, boxHeight / img.naturalHeight);
   const dw = img.naturalWidth * k;
   const dh = img.naturalHeight * k;
-  ctx.drawImage(img, (CW - dw) / 2, boxTop + (boxHeight - dh) / 2, dw, dh);
+  ctx.drawImage(img, cx - dw / 2, boxTop + (boxHeight - dh) / 2, dw, dh);
 
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#fff';
+  ctx.font = captionFont(opts, titleSize);
+  titleLines.forEach((line, i) => ctx.fillText(line, cx, safe.y + i * titleSize * 1.2));
 
-  ctx.font = captionFont(opts, 44 * scale);
-  const title = shot.painting.title;
-  ctx.fillText(title, CW / 2, CH * 0.145);
-
-  ctx.font = captionFont(opts, 30 * scale);
-  ctx.fillStyle = 'rgba(255,255,255,0.78)';
-  const by = [shot.painting.artist, shot.painting.year].filter(Boolean).join(', ');
-  if (by) ctx.fillText(by, CW / 2, CH * 0.185);
+  if (by) {
+    ctx.font = captionFont(opts, bySize);
+    ctx.fillStyle = 'rgba(255,255,255,0.78)';
+    ctx.fillText(by, cx, safe.y + titleHeight + bySize * 0.2);
+  }
 
   if (shot.painting.museum) {
-    ctx.font = captionFont(opts, 22 * scale);
+    ctx.font = captionFont(opts, creditSize);
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText(shot.painting.museum, CW / 2, CH * 0.82);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(shot.painting.museum, cx, safe.y + safe.h);
   }
 
   ctx.restore();
@@ -431,5 +491,28 @@ export function drawCropEditor(ctx, img, focus, opts) {
   ctx.lineWidth = 2.5;
   ctx.strokeRect(box.x, box.y, box.w, box.h);
 
+  ctx.restore();
+}
+
+/**
+ * The title-safe rectangle, drawn over the preview only — never into a render.
+ * Everything outside it is where the app's own controls land.
+ */
+export function drawSafeZone(ctx, opts) {
+  const CW = opts.width;
+  const CH = opts.height;
+  const safe = safeArea(CW, CH);
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(240,60,80,0.16)';
+  ctx.beginPath();
+  ctx.rect(0, 0, CW, CH);
+  ctx.rect(safe.x, safe.y, safe.w, safe.h);
+  ctx.fill('evenodd');
+
+  ctx.strokeStyle = 'rgba(255,230,60,0.9)';
+  ctx.lineWidth = Math.max(1, CH / 640);
+  ctx.setLineDash([10, 7]);
+  ctx.strokeRect(safe.x, safe.y, safe.w, safe.h);
   ctx.restore();
 }
