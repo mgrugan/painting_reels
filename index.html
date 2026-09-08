@@ -204,6 +204,19 @@
             <button id="cancelRenderBtn" class="ghost small" type="button" hidden>Stop</button>
           </div>
           <div class="progress" id="progress" hidden><div class="bar" id="progressBar"></div></div>
+          <p class="note" id="renderHint" hidden>
+            Rendering plays the reel through once in real time. Leave this tab in front —
+            if you switch away it pauses and picks up where it left off.
+          </p>
+
+          <div class="result" id="result" hidden>
+            <video id="resultVideo" controls playsinline preload="metadata"></video>
+            <div class="row">
+              <a id="saveLink" class="primary save" download>Save video</a>
+              <button id="openTab" class="ghost small" type="button">Open in a tab</button>
+            </div>
+            <p class="note" id="resultMeta"></p>
+          </div>
         </div>
 
         <div class="script" id="script" hidden>

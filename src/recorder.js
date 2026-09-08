@@ -53,6 +53,7 @@ export function isSupported() {
  * @param {ArrayBuffer|null} args.audioBuffer  decoded music, or null
  * @param {number} args.audioGain             0..1
  * @param {(p:number)=>void} args.onProgress
+ * @param {(hidden:boolean)=>void} args.onHidden  the tab went away / came back
  * @param {AbortSignal} args.signal
  * @returns {Promise<{blob: Blob, mimeType: string, extension: string}>}
  */
@@ -63,6 +64,7 @@ export async function record({
   audioBuffer = null,
   audioGain = 0.35,
   onProgress = () => {},
+  onHidden = () => {},
   signal,
 }) {
   const mimeType = pickMimeType();
@@ -97,43 +99,86 @@ export async function record({
 
   const started = performance.now();
   let stopped = false;
+  let hiddenSince = 0;
+  let hiddenTotal = 0;
 
   const stop = () => {
     if (stopped) return;
     stopped = true;
+    document.removeEventListener('visibilitychange', onVisibility);
     audio?.stop();
     if (recorder.state !== 'inactive') recorder.stop();
     stream.getTracks().forEach((track) => track.stop());
   };
 
-  signal?.addEventListener('abort', stop, { once: true });
-
-  await new Promise((resolve) => {
-    const tick = () => {
-      const time = (performance.now() - started) / 1000;
-      if (stopped || time >= timeline.duration) {
-        // Hold the final frame briefly so the last shot is not clipped.
-        drawFrame(ctx, timeline, timeline.duration);
-        onProgress(1);
-        setTimeout(() => {
-          stop();
-          resolve();
-        }, 180);
-        return;
-      }
-      drawFrame(ctx, timeline, time);
-      onProgress(time / timeline.duration);
+  /**
+   * Browsers stop firing requestAnimationFrame in a background tab, which would
+   * strand a long render halfway with no file and no error. Pause the recorder
+   * and the clock together when the tab goes away, and pick both up on return,
+   * so leaving the tab costs wall-clock time but never the export.
+   */
+  function onVisibility() {
+    if (stopped) return;
+    if (document.hidden) {
+      hiddenSince = performance.now();
+      if (recorder.state === 'recording') recorder.pause();
+      audio?.suspend();
+      onHidden(true);
+    } else {
+      hiddenTotal += performance.now() - hiddenSince;
+      hiddenSince = 0;
+      if (recorder.state === 'paused') recorder.resume();
+      audio?.resume();
+      onHidden(false);
       requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    }
+  }
+
+  let resolveLoop;
+  const loop = new Promise((resolve) => {
+    resolveLoop = resolve;
   });
 
+  function tick() {
+    if (stopped) return;
+    if (document.hidden) return; // onVisibility restarts the loop
+    const time = (performance.now() - started - hiddenTotal) / 1000;
+    if (time >= timeline.duration) {
+      // Hold the final frame briefly so the last shot is not clipped.
+      drawFrame(ctx, timeline, timeline.duration);
+      onProgress(1);
+      setTimeout(() => {
+        stop();
+        resolveLoop();
+      }, 180);
+      return;
+    }
+    drawFrame(ctx, timeline, time);
+    onProgress(time / timeline.duration);
+    requestAnimationFrame(tick);
+  }
+
+  signal?.addEventListener('abort', () => {
+    stop();
+    resolveLoop();
+  }, { once: true });
+
+  document.addEventListener('visibilitychange', onVisibility);
+  requestAnimationFrame(tick);
+
+  await loop;
   await finished;
 
   if (signal?.aborted) throw new DOMException('Render cancelled', 'AbortError');
 
   const isMp4 = mimeType.startsWith('video/mp4');
   let blob = new Blob(chunks, { type: mimeType });
+  if (!blob.size) {
+    throw new Error(
+      'The recorder produced an empty file. This usually means the tab lost focus for ' +
+        'the whole render — try again and leave this tab in front.',
+    );
+  }
   if (!isMp4) blob = await patchWebmDuration(blob, timeline.duration);
 
   return { blob, mimeType, extension: isMp4 ? 'mp4' : 'webm' };
@@ -169,6 +214,12 @@ function buildAudio(audioBuffer, duration, gain) {
       volume.gain.setValueAtTime(gain, now + Math.max(1.5, duration - 2));
       volume.gain.linearRampToValueAtTime(0.0001, now + duration);
       source.start();
+    },
+    suspend() {
+      if (context.state === 'running') context.suspend();
+    },
+    resume() {
+      if (context.state === 'suspended') context.resume();
     },
     stop() {
       try {

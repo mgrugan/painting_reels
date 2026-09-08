@@ -40,6 +40,15 @@ pick a painting, press **Generate reel**.
    video file. Rendering happens in real time, so a 100-second reel takes 100
    seconds and what you watch is what you get.
 
+   Leave the tab in front while it runs. If you do switch away, the render pauses
+   and resumes when you come back rather than stalling — but it cannot run faster
+   than real time in the background.
+
+5. **Save it.** The file downloads automatically, *and* stays on the page behind
+   a **Save video** button with a preview. Browsers can refuse a download that
+   has no user gesture behind it, and a two-minute render always outlives the
+   click that started it, so the button is the path that always works.
+
 The last shot is a title card: the whole painting, its title, artist and
 collection. Holding that back until the end is the point of the format.
 

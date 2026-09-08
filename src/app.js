@@ -22,6 +22,7 @@ const state = {
   script: null,
   timeline: null,
   audioBuffer: null,
+  result: null,
   playing: false,
   playHead: 0,
   busy: false,
@@ -136,6 +137,7 @@ async function select(painting) {
   state.script = null;
   state.timeline = null;
   stopPlayback();
+  clearResult();
   renderGrid();
   $('script').hidden = true;
   $('generateBtn').disabled = state.busy;
@@ -320,7 +322,7 @@ function rebuildTimeline() {
 function seek(time) {
   if (!state.timeline) return;
   state.playHead = Math.min(state.timeline.duration, Math.max(0, time));
-  drawFrame(ctx, state.timeline, state.playHead);
+  drawFrame(ctx, state.timeline, state.playHead, false);
   $('scrub').value = String(Math.round((state.playHead / state.timeline.duration) * 1000));
   updateTimecode();
   $('phoneEmpty').hidden = true;
@@ -361,13 +363,17 @@ function stopPlayback() {
 
 async function renderVideo() {
   if (!state.timeline) return;
-  if (!isSupported()) return toast('This browser cannot record video from a canvas. Try Chrome or Edge.', true);
+  if (!isSupported()) {
+    return toast('This browser cannot record video from a canvas. Try Chrome, Edge or Safari.', true);
+  }
 
   stopPlayback();
+  clearResult();
   setBusy(true, 'Rendering…');
   state.abort = new AbortController();
   $('cancelRenderBtn').hidden = false;
   $('progress').hidden = false;
+  $('renderHint').hidden = false;
 
   try {
     const { blob, extension } = await record({
@@ -380,10 +386,14 @@ async function renderVideo() {
       onProgress: (p) => {
         $('progressBar').style.width = `${(p * 100).toFixed(1)}%`;
       },
+      onHidden: (hidden) => {
+        $('renderHint').textContent = hidden
+          ? 'Paused while this tab is in the background. Come back to carry on.'
+          : 'Rendering plays the reel through once in real time. Leave this tab in front — if you switch away it pauses and picks up where it left off.';
+      },
     });
-    const name = slug(state.script.reelTitle || state.selected.title);
-    downloadBlob(blob, `${name}.${extension}`);
-    toast(`Saved ${name}.${extension} — ${(blob.size / 1e6).toFixed(1)} MB.`);
+
+    showResult(blob, `${slug(state.script.reelTitle || state.selected.title)}.${extension}`);
   } catch (err) {
     if (err?.name !== 'AbortError') toast(err.message || 'Rendering failed.', true);
   } finally {
@@ -391,9 +401,56 @@ async function renderVideo() {
     $('cancelRenderBtn').hidden = true;
     $('progress').hidden = true;
     $('progressBar').style.width = '0%';
+    $('renderHint').hidden = true;
     setBusy(false);
     seek(0);
   }
+}
+
+/**
+ * Hands over the finished file two ways.
+ *
+ * The automatic download is the fast path, but browsers can refuse a download
+ * that no longer has a user gesture behind it, and a two-minute render always
+ * outlives the click that started it. So the file also stays on the page behind
+ * a real link the user can click, which nothing blocks.
+ */
+function showResult(blob, filename) {
+  clearResult();
+  const url = URL.createObjectURL(blob);
+  state.result = { blob, filename, url };
+
+  const link = $('saveLink');
+  link.href = url;
+  link.download = filename;
+  link.textContent = `Save ${filename}`;
+
+  $('resultVideo').src = url;
+  $('resultMeta').textContent =
+    `${(blob.size / 1e6).toFixed(1)} MB · ${fmt(state.timeline.duration)} · ` +
+    `${canvas.width}×${canvas.height}. If the download did not start, use Save above.`;
+  $('result').hidden = false;
+  $('result').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  let autoSaved = true;
+  try {
+    downloadBlob(blob, filename);
+  } catch {
+    autoSaved = false;
+  }
+  toast(
+    autoSaved
+      ? `Rendered ${filename} — check your downloads, or use Save below.`
+      : `Rendered ${filename} — press Save below to keep it.`,
+  );
+}
+
+function clearResult() {
+  if (state.result) URL.revokeObjectURL(state.result.url);
+  state.result = null;
+  $('resultVideo').removeAttribute('src');
+  $('saveLink').removeAttribute('href');
+  $('result').hidden = true;
 }
 
 const slug = (s) =>
@@ -493,6 +550,35 @@ function bind() {
   $('cancelRenderBtn').addEventListener('click', () => state.abort?.abort());
 
   $('playBtn').addEventListener('click', () => (state.playing ? stopPlayback() : startPlayback()));
+
+  // Where the File System Access API exists, a click can open a real save dialog.
+  // Everywhere else the anchor's own download behaviour takes over.
+  $('saveLink').addEventListener('click', async (event) => {
+    if (!state.result || typeof window.showSaveFilePicker !== 'function') return;
+    event.preventDefault();
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: state.result.filename,
+        types: [
+          {
+            description: 'Video',
+            accept: { [state.result.blob.type.split(';')[0]]: [`.${state.result.filename.split('.').pop()}`] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(state.result.blob);
+      await writable.close();
+      toast('Saved.');
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // the user closed the dialog
+      downloadBlob(state.result.blob, state.result.filename);
+    }
+  });
+
+  $('openTab').addEventListener('click', () => {
+    if (state.result) window.open(state.result.url, '_blank', 'noopener');
+  });
 
   $('scrub').addEventListener('input', (event) => {
     if (!state.timeline) return;

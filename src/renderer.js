@@ -54,7 +54,11 @@ export function buildTimeline(script, img, opts) {
   return { shots, duration: t, img, opts };
 }
 
-export function drawFrame(ctx, timeline, time) {
+/**
+ * @param {boolean} fade  the dip in and out belongs in the exported file; the
+ *   scrubbable preview skips it so seeking to 0:00 does not show a black frame.
+ */
+export function drawFrame(ctx, timeline, time, fade = true) {
   const { opts } = timeline;
   const CW = opts.width;
   const CH = opts.height;
@@ -82,12 +86,14 @@ export function drawFrame(ctx, timeline, time) {
   if (opts.watermark) drawWatermark(ctx, opts);
 
   // A short dip in and out keeps the export from starting on a hard flash.
-  const fade =
-    Math.min(1, time / FADE_IN) *
-    Math.min(1, Math.max(0, timeline.duration - time) / FADE_OUT);
-  if (fade < 1) {
-    ctx.fillStyle = `rgba(0,0,0,${1 - clamp01(fade)})`;
-    ctx.fillRect(0, 0, CW, CH);
+  if (fade) {
+    const level =
+      Math.min(1, time / FADE_IN) *
+      Math.min(1, Math.max(0, timeline.duration - time) / FADE_OUT);
+    if (level < 1) {
+      ctx.fillStyle = `rgba(0,0,0,${1 - clamp01(level)})`;
+      ctx.fillRect(0, 0, CW, CH);
+    }
   }
 
   ctx.restore();
