@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Painting Reels</title>
+<meta name="description" content="Turn a public-domain painting into a vertical story reel." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23111'/%3E%3Ccircle cx='50' cy='42' r='17' fill='%23e8c07a'/%3E%3Cpath d='M20 84c6-19 17-27 30-27s24 8 30 27z' fill='%23e8c07a'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ───────────────────────── sidebar ───────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <header class="brand">
+      <span class="brand-mark"></span>
+      <div>
+        <h1>Painting Reels</h1>
+        <p>Story videos from old paintings</p>
+      </div>
+    </header>
+
+    <nav class="side-scroll">
+
+      <section class="panel">
+        <h2>Anthropic API key</h2>
+        <div class="key-row">
+          <input id="apiKey" type="password" spellcheck="false" autocomplete="off"
+                 placeholder="sk-ant-..." />
+          <button id="keyReveal" class="ghost icon" type="button" title="Show / hide">show</button>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="rememberKey" />
+          <span>Remember on this device</span>
+        </label>
+        <p class="note" id="keyNote">
+          The key is held in this tab only and is sent to <code>api.anthropic.com</code> and nowhere
+          else. This page has no backend.
+        </p>
+        <div class="row">
+          <button id="testKey" class="ghost small" type="button">Test key</button>
+          <button id="forgetKey" class="ghost small danger" type="button">Forget key</button>
+        </div>
+        <p class="status" id="keyStatus"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Model</h2>
+        <select id="model">
+          <option value="claude-opus-5">Claude Opus 5 — best stories</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 — cheapest</option>
+        </select>
+        <div class="field">
+          <label for="effort">Effort <span class="hint" id="effortVal">high</span></label>
+          <select id="effort">
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high" selected>high</option>
+          </select>
+        </div>
+        <p class="note">Estimated cost per script: <strong id="costEst">—</strong></p>
+      </section>
+
+      <section class="panel">
+        <h2>Story</h2>
+        <div class="field">
+          <label for="voice">Voice</label>
+          <select id="voice">
+            <option value="plain">Plain and quiet (like the samples)</option>
+            <option value="detective">Detective — clue by clue</option>
+            <option value="witness">Eyewitness — present tense</option>
+            <option value="essay">Short essay — reflective</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="beats">Beats <span class="hint" id="beatsVal">11</span></label>
+          <input type="range" id="beats" min="5" max="16" value="11" />
+        </div>
+        <div class="field">
+          <label for="secs">Seconds per beat <span class="hint" id="secsVal">7.5s</span></label>
+          <input type="range" id="secs" min="4" max="12" step="0.5" value="7.5" />
+        </div>
+        <label class="check">
+          <input type="checkbox" id="strictFacts" checked />
+          <span>Strict mode — no invented facts</span>
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Video</h2>
+        <div class="field">
+          <label for="res">Resolution</label>
+          <select id="res">
+            <option value="1080">1080 × 1920</option>
+            <option value="720" selected>720 × 1280</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fps">Frame rate</label>
+          <select id="fps">
+            <option value="30" selected>30 fps</option>
+            <option value="24">24 fps</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="motion">Motion <span class="hint" id="motionVal">12%</span></label>
+          <input type="range" id="motion" min="0" max="30" value="12" />
+        </div>
+        <label class="check">
+          <input type="checkbox" id="showTitleCard" checked />
+          <span>End on a title card</span>
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Captions</h2>
+        <div class="field">
+          <label for="fontFamily">Typeface</label>
+          <select id="fontFamily">
+            <option value='700 %spx "Helvetica Neue", Helvetica, Arial, sans-serif'>Helvetica Bold</option>
+            <option value='800 %spx Inter, "Segoe UI", Roboto, sans-serif'>Inter Extrabold</option>
+            <option value='900 %spx Georgia, "Times New Roman", serif'>Georgia Black</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fontSize">Size <span class="hint" id="fontSizeVal">52</span></label>
+          <input type="range" id="fontSize" min="34" max="76" value="52" />
+        </div>
+        <div class="field">
+          <label for="capPos">Default position</label>
+          <select id="capPos">
+            <option value="auto" selected>Let the model choose</option>
+            <option value="center">Centre</option>
+            <option value="lower">Lower third</option>
+            <option value="top">Top</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="watermark">Watermark</label>
+          <input id="watermark" type="text" placeholder="@your_handle" />
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Audio</h2>
+        <input type="file" id="musicFile" accept="audio/*" />
+        <p class="note" id="musicNote">Optional. The file stays on your machine.</p>
+        <div class="field">
+          <label for="musicVol">Volume <span class="hint" id="musicVolVal">35%</span></label>
+          <input type="range" id="musicVol" min="0" max="100" value="35" />
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Library</h2>
+        <p class="note">
+          <span id="libCount">0</span> public-domain paintings, loaded from Wikimedia Commons.
+        </p>
+        <button id="addOwn" class="ghost small" type="button">Add your own image…</button>
+        <input type="file" id="ownFile" accept="image/*" hidden />
+      </section>
+
+    </nav>
+  </aside>
+
+  <!-- ───────────────────────── main ───────────────────────── -->
+  <main class="main">
+    <div class="topbar">
+      <button class="ghost icon menu" id="menuBtn" type="button" aria-label="Settings">☰</button>
+      <div class="search">
+        <input id="search" type="search" placeholder="Search paintings, painters, subjects…" />
+      </div>
+      <button id="randomBtn" class="ghost" type="button">Surprise me</button>
+      <button id="generateBtn" class="primary" type="button" disabled>Generate reel</button>
+    </div>
+
+    <div class="stage">
+
+      <section class="col-left">
+        <div class="section-head">
+          <h2>Library</h2>
+          <span class="muted" id="gridCount"></span>
+        </div>
+        <div class="grid" id="grid"></div>
+      </section>
+
+      <section class="col-right">
+        <div class="preview-wrap">
+          <div class="phone">
+            <canvas id="canvas" width="720" height="1280"></canvas>
+            <div class="phone-empty" id="phoneEmpty">
+              <p>Pick a painting,<br />then press <strong>Generate reel</strong>.</p>
+            </div>
+          </div>
+          <div class="transport">
+            <button id="playBtn" class="ghost small" type="button" disabled>Play</button>
+            <input type="range" id="scrub" min="0" max="1000" value="0" disabled />
+            <span class="timecode" id="timecode">0:00 / 0:00</span>
+          </div>
+          <div class="row export-row">
+            <button id="renderBtn" class="primary" type="button" disabled>Render &amp; download</button>
+            <button id="cancelRenderBtn" class="ghost small" type="button" hidden>Stop</button>
+          </div>
+          <div class="progress" id="progress" hidden><div class="bar" id="progressBar"></div></div>
+        </div>
+
+        <div class="script" id="script" hidden>
+          <div class="section-head">
+            <h2 id="scriptTitle">Script</h2>
+            <div class="row">
+              <button id="rewriteBtn" class="ghost small" type="button">Rewrite</button>
+              <button id="copyScript" class="ghost small" type="button">Copy text</button>
+            </div>
+          </div>
+          <p class="muted small" id="scriptMeta"></p>
+          <ol class="beats" id="beatList"></ol>
+          <p class="note" id="sourcesNote"></p>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+  </main>
+</div>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
