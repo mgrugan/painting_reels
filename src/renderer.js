@@ -13,6 +13,9 @@ const TITLE_CARD_SECONDS = 4.2;
 /** Fraction of the frame height a caption block may take before it shrinks. */
 const CAPTION_MAX_HEIGHT = 0.34;
 
+/** How far below centre the subject sits, to open a caption band above it. */
+const SUBJECT_LIFT = 0.11;
+
 /**
  * @param {object} script  from writeScript()
  * @param {HTMLImageElement} img
@@ -107,8 +110,8 @@ export function drawFrame(ctx, timeline, time) {
 function frameRect(focus, iw, ih, aspect) {
   let w = focus.w * iw;
   let h = focus.h * ih;
-  let cx = (focus.x + focus.w / 2) * iw;
-  let cy = (focus.y + focus.h / 2) * ih;
+  const cx0 = (focus.x + focus.w / 2) * iw;
+  const cy0 = (focus.y + focus.h / 2) * ih;
 
   if (w / h > aspect) {
     h = Math.min(ih, w / aspect);
@@ -116,9 +119,15 @@ function frameRect(focus, iw, ih, aspect) {
     w = Math.min(iw, h * aspect);
   }
 
-  // A crop that is a hair off the edge should slide in, not be squashed.
-  cx = Math.min(iw - w / 2, Math.max(w / 2, cx));
-  cy = Math.min(ih - h / 2, Math.max(h / 2, cy));
+  // Growing a crop to 9:16 leaves slack above and below the subject. Spending it
+  // evenly centres the subject, which is the one place the caption cannot go, so
+  // the slack is spent on one side to open a band for text. The subject sits a
+  // little low and the band opens above it: Instagram and TikTok lay their own
+  // controls over the bottom of the frame, so that is the worse place to put
+  // words. Where the edge of the painting forbids the offset the crop slides in
+  // and the caption takes whichever side is actually clear.
+  const cx = Math.min(iw - w / 2, Math.max(w / 2, cx0));
+  const cy = Math.min(ih - h / 2, Math.max(h / 2, cy0 - h * SUBJECT_LIFT));
 
   return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
