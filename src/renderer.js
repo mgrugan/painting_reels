@@ -8,9 +8,10 @@
  * frame.
  */
 
-const FADE_IN = 0.4;
-const FADE_OUT = 0.5;
 const TITLE_CARD_SECONDS = 4.2;
+
+/** Fraction of the frame height a caption block may take before it shrinks. */
+const CAPTION_MAX_HEIGHT = 0.34;
 
 /**
  * @param {object} script  from writeScript()
@@ -28,14 +29,26 @@ export function buildTimeline(script, img, opts) {
   const shots = script.beats.map((beat) => {
     const frame = frameRect(beat.focus, iw, ih, aspect);
     const [from, to] = moveRects(frame, beat.motion, amp, iw, ih);
+    const subject = {
+      x: beat.focus.x * iw,
+      y: beat.focus.y * ih,
+      w: beat.focus.w * iw,
+      h: beat.focus.h * ih,
+    };
     const shot = {
       kind: 'beat',
       start: t,
       end: t + beat.seconds,
       from,
       to,
+      subject,
       text: beat.text,
-      captionPos: opts.capPos && opts.capPos !== 'auto' ? opts.capPos : beat.captionPos,
+      // Placement is decided once, from the middle of the move, so the caption
+      // does not drift up and down while the camera pushes in.
+      captionPos:
+        opts.capPos && opts.capPos !== 'auto'
+          ? opts.capPos
+          : placeCaption(subject, lerpRect(from, to, 0.5), CW, CH),
     };
     t = shot.end;
     return shot;
@@ -54,11 +67,7 @@ export function buildTimeline(script, img, opts) {
   return { shots, duration: t, img, opts };
 }
 
-/**
- * @param {boolean} fade  the dip in and out belongs in the exported file; the
- *   scrubbable preview skips it so seeking to 0:00 does not show a black frame.
- */
-export function drawFrame(ctx, timeline, time, fade = true) {
+export function drawFrame(ctx, timeline, time) {
   const { opts } = timeline;
   const CW = opts.width;
   const CH = opts.height;
@@ -73,7 +82,7 @@ export function drawFrame(ctx, timeline, time, fade = true) {
 
   if (shot) {
     if (shot.kind === 'title') {
-      drawTitleCard(ctx, timeline, shot, time);
+      drawTitleCard(ctx, timeline, shot);
     } else {
       const local = shot.end === shot.start ? 0 : (time - shot.start) / (shot.end - shot.start);
       const p = easeInOut(clamp01(local));
@@ -84,17 +93,6 @@ export function drawFrame(ctx, timeline, time, fade = true) {
   }
 
   if (opts.watermark) drawWatermark(ctx, opts);
-
-  // A short dip in and out keeps the export from starting on a hard flash.
-  if (fade) {
-    const level =
-      Math.min(1, time / FADE_IN) *
-      Math.min(1, Math.max(0, timeline.duration - time) / FADE_OUT);
-    if (level < 1) {
-      ctx.fillStyle = `rgba(0,0,0,${1 - clamp01(level)})`;
-      ctx.fillRect(0, 0, CW, CH);
-    }
-  }
 
   ctx.restore();
 }
@@ -190,6 +188,44 @@ const lerpRect = (a, b, p) => ({
 const easeInOut = (p) => 0.5 - Math.cos(Math.PI * p) / 2;
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
+/**
+ * Where the subject lands on screen, given the region currently being shown.
+ * Both rectangles are in painting pixels; the result is in canvas pixels and
+ * may extend past the frame when the camera is pushed in past the subject.
+ */
+function projectRect(rect, view, CW, CH) {
+  const scale = Math.min(CW / view.w, CH / view.h);
+  const dx = (CW - view.w * scale) / 2;
+  const dy = (CH - view.h * scale) / 2;
+  return {
+    x: dx + (rect.x - view.x) * scale,
+    y: dy + (rect.y - view.y) * scale,
+    w: rect.w * scale,
+    h: rect.h * scale,
+  };
+}
+
+/**
+ * Keeps the caption off the thing the caption is about.
+ *
+ * The camera is always built around the subject, so the middle of the frame is
+ * exactly where the text must not go. Measure the clear space above and below
+ * the subject and take the roomier side; only fall back to the centre when the
+ * subject fills the frame top to bottom and there is nowhere better.
+ */
+function placeCaption(subject, view, CW, CH) {
+  const box = projectRect(subject, view, CW, CH);
+  const above = Math.max(0, box.y);
+  const below = Math.max(0, CH - (box.y + box.h));
+  const needed = CH * 0.2;
+
+  // A subject that fills the frame — the opening full-painting shot, usually —
+  // has no clear band at all. The lower third is the least destructive place to
+  // put text over a whole picture: faces and hands are rarely down there.
+  if (above < needed && below < needed) return 'lower';
+  return below >= above ? 'lower' : 'top';
+}
+
 function drawView(ctx, img, view, CW, CH) {
   const scale = Math.min(CW / view.w, CH / view.h);
   const dw = view.w * scale;
@@ -213,24 +249,25 @@ function drawCaption(ctx, text, position, opts) {
   const CW = opts.width;
   const CH = opts.height;
   const scale = CH / 1280;
-  let size = (opts.fontSize || 52) * scale;
-  const maxWidth = CW * 0.86;
+  let size = (opts.fontSize || 44) * scale;
+  const maxWidth = CW * 0.84;
 
-  // Long beats shrink a little rather than running off the bottom of the frame.
+  // A long beat shrinks rather than growing a block that swallows the picture.
   let lines = wrap(ctx, text, maxWidth, captionFont(opts, size));
-  while (lines.length > 6 && size > 26 * scale) {
-    size *= 0.92;
+  while (lines.length * size * 1.22 > CH * CAPTION_MAX_HEIGHT && size > 24 * scale) {
+    size *= 0.94;
     lines = wrap(ctx, text, maxWidth, captionFont(opts, size));
   }
 
   const lineHeight = size * 1.22;
   const blockHeight = lines.length * lineHeight;
+  const margin = CH * 0.055;
 
   let top;
-  if (position === 'top') top = CH * 0.11;
-  else if (position === 'lower') top = CH * 0.8 - blockHeight;
+  if (position === 'top') top = margin + CH * 0.02;
+  else if (position === 'lower') top = CH - margin - CH * 0.055 - blockHeight;
   else top = (CH - blockHeight) / 2;
-  top = Math.min(CH - blockHeight - CH * 0.06, Math.max(CH * 0.06, top));
+  top = Math.min(CH - blockHeight - margin, Math.max(margin, top));
 
   ctx.font = captionFont(opts, size);
   ctx.textAlign = 'center';
@@ -282,15 +319,13 @@ function drawWatermark(ctx, opts) {
   ctx.restore();
 }
 
-function drawTitleCard(ctx, timeline, shot, time) {
+function drawTitleCard(ctx, timeline, shot) {
   const { opts, img } = timeline;
   const CW = opts.width;
   const CH = opts.height;
   const scale = CH / 1280;
-  const p = clamp01((time - shot.start) / 0.5);
 
   ctx.save();
-  ctx.globalAlpha = p;
 
   const boxTop = CH * 0.2;
   const boxHeight = CH * 0.56;
@@ -317,6 +352,75 @@ function drawTitleCard(ctx, timeline, shot, time) {
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.fillText(shot.painting.museum, CW / 2, CH * 0.82);
   }
+
+  ctx.restore();
+}
+
+/* ── crop editing ───────────────────────────────────────────────────────── */
+
+/**
+ * How the whole painting is laid into the frame while a crop is being adjusted.
+ * Shared by the drawing code and by the pointer maths, so a drag lands exactly
+ * where the cursor is.
+ */
+export function paintingFit(img, CW, CH) {
+  const scale = Math.min(CW / img.naturalWidth, CH / img.naturalHeight);
+  const w = img.naturalWidth * scale;
+  const h = img.naturalHeight * scale;
+  return { x: (CW - w) / 2, y: (CH - h) / 2, w, h, scale };
+}
+
+/** Canvas pixels → fractions of the painting. */
+export function toPaintingSpace(point, fit) {
+  return {
+    x: clamp01((point.x - fit.x) / fit.w),
+    y: clamp01((point.y - fit.y) / fit.h),
+  };
+}
+
+/**
+ * The whole painting, dimmed outside the crop, with the 9:16 frame the camera
+ * will actually see drawn inside it — so what you drag is what you get.
+ */
+export function drawCropEditor(ctx, img, focus, opts) {
+  const CW = opts.width;
+  const CH = opts.height;
+  const fit = paintingFit(img, CW, CH);
+
+  ctx.save();
+  ctx.fillStyle = '#0b0b0d';
+  ctx.fillRect(0, 0, CW, CH);
+  ctx.drawImage(img, fit.x, fit.y, fit.w, fit.h);
+
+  const box = {
+    x: fit.x + focus.x * fit.w,
+    y: fit.y + focus.y * fit.h,
+    w: focus.w * fit.w,
+    h: focus.h * fit.h,
+  };
+
+  ctx.fillStyle = 'rgba(8,8,10,0.62)';
+  ctx.beginPath();
+  ctx.rect(0, 0, CW, CH);
+  ctx.rect(box.x, box.y, box.w, box.h);
+  ctx.fill('evenodd');
+
+  // What the shot will really frame, once the crop is grown to 9:16.
+  const framed = frameRect(focus, img.naturalWidth, img.naturalHeight, CW / CH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.setLineDash([6, 5]);
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(
+    fit.x + (framed.x / img.naturalWidth) * fit.w,
+    fit.y + (framed.y / img.naturalHeight) * fit.h,
+    (framed.w / img.naturalWidth) * fit.w,
+    (framed.h / img.naturalHeight) * fit.h,
+  );
+
+  ctx.setLineDash([]);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(box.x, box.y, box.w, box.h);
 
   ctx.restore();
 }

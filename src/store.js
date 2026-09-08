@@ -21,7 +21,7 @@ export const DEFAULTS = {
   motion: 12,
   showTitleCard: true,
   fontFamily: '700 %spx "Helvetica Neue", Helvetica, Arial, sans-serif',
-  fontSize: 52,
+  fontSize: 44,
   capPos: 'auto',
   watermark: '@explainingpaintings',
   musicVol: 35,

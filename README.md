@@ -31,10 +31,17 @@ pick a painting, press **Generate reel**.
 2. **One API call.** The painting is downscaled to 1000px, JPEG-encoded, and sent
    with its catalogue facts to the Messages API. Claude returns a structured
    script: a hook, a run of detail beats, and a payoff. Each beat carries the
-   caption text *and* the region of the painting the camera should be looking at
-   while that caption is on screen.
+   caption text, the thing the shot has to be *of*, and the region of the
+   painting the camera should be looking at while that caption is on screen.
+
+   The image is sent with a numbered 0.0–1.0 grid drawn over it. Asking a model
+   to estimate "the glove is about 55% across and 90% down" on a bare rectangle
+   is where crops go wrong; giving it a ruler to read is most of the fix.
 3. **Edit anything.** Every line in the script panel is editable, and the preview
-   updates as you type.
+   updates as you type. If a shot still lands beside the thing it is about,
+   **Adjust framing** puts the whole painting on screen and you drag a new box
+   over it — solid outline is what you picked, dashed is what the 9:16 frame will
+   actually show.
 4. **Render.** A canvas draws the shots — slow push-ins, pull-backs and drifts
    across each crop, captions burnt in — and `MediaRecorder` captures it to a
    video file. Rendering happens in real time, so a 100-second reel takes 100
@@ -49,8 +56,14 @@ pick a painting, press **Generate reel**.
    has no user gesture behind it, and a two-minute render always outlives the
    click that started it, so the button is the path that always works.
 
-The last shot is a title card: the whole painting, its title, artist and
-collection. Holding that back until the end is the point of the format.
+The opening shot is always the whole painting, and the last shot is a title card:
+the painting again, with its title, artist and collection. Holding the title back
+until the end is the point of the format.
+
+Captions place themselves. The camera is always built around the subject, so the
+middle of the frame is exactly where text must not go; each caption measures the
+clear space above and below its subject and takes the roomier side. You can
+override that per reel in the sidebar.
 
 ## Cost
 

@@ -125,8 +125,8 @@
           </select>
         </div>
         <div class="field">
-          <label for="fontSize">Size <span class="hint" id="fontSizeVal">52</span></label>
-          <input type="range" id="fontSize" min="34" max="76" value="52" />
+          <label for="fontSize">Size <span class="hint" id="fontSizeVal">44</span></label>
+          <input type="range" id="fontSize" min="30" max="72" value="44" />
         </div>
         <div class="field">
           <label for="capPos">Default position</label>
@@ -193,6 +193,10 @@
             <div class="phone-empty" id="phoneEmpty">
               <p>Pick a painting,<br />then press <strong>Generate reel</strong>.</p>
             </div>
+          </div>
+          <div class="cropbar" id="cropBar" hidden>
+            <span>Drag on the picture to reframe this shot.</span>
+            <button id="cropDone" class="ghost small" type="button">Done</button>
           </div>
           <div class="transport">
             <button id="playBtn" class="ghost small" type="button" disabled>Play</button>

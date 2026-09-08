@@ -7,7 +7,7 @@ import { DEFAULTS, loadSettings, saveSettings, loadApiKey, rememberApiKey, forge
 import { estimateCost, testKey, AnthropicError } from './anthropic.js';
 import { writeScript, estimateTokens } from './script.js';
 import { loadImage, toModelImage, readFileAsDataUrl } from './images.js';
-import { buildTimeline, drawFrame } from './renderer.js';
+import { buildTimeline, drawFrame, drawCropEditor, paintingFit, toPaintingSpace } from './renderer.js';
 import { record, decodeAudioFile, downloadBlob, isSupported, outputFormat } from './recorder.js';
 
 const $ = (id) => document.getElementById(id);
@@ -23,6 +23,8 @@ const state = {
   timeline: null,
   audioBuffer: null,
   result: null,
+  cropping: null,
+  lastUsage: null,
   playing: false,
   playHead: 0,
   busy: false,
@@ -137,6 +139,7 @@ async function select(painting) {
   state.script = null;
   state.timeline = null;
   stopPlayback();
+  stopCropping();
   clearResult();
   renderGrid();
   $('script').hidden = true;
@@ -185,6 +188,7 @@ async function generate() {
   if (!state.apiKey) return toast('Add your Anthropic API key in the sidebar.', true);
   if (!state.image) return toast('That painting has not loaded yet.', true);
 
+  stopCropping();
   setBusy(true, 'Writing…');
   state.abort = new AbortController();
 
@@ -207,8 +211,9 @@ async function generate() {
     if (!script.beats.length) throw new Error('The model returned an empty script.');
 
     state.script = script;
-    renderScript(usage);
+    state.lastUsage = usage;
     rebuildTimeline();
+    renderScript(usage);
     seek(0);
     toast(`Script ready — ${script.beats.length} shots, ${fmt(state.timeline.duration)}.`);
   } catch (err) {
@@ -230,7 +235,7 @@ function describe(err) {
   return err?.message || 'Something went wrong.';
 }
 
-function renderScript(usage) {
+function renderScript(usage = state.lastUsage) {
   const script = state.script;
   $('script').hidden = false;
   $('scriptTitle').textContent = script.reelTitle || 'Script';
@@ -259,12 +264,15 @@ function renderScript(usage) {
     const label = document.createElement('span');
     label.textContent = beat.role === 'hook' ? 'Hook' : beat.role === 'payoff' ? 'Payoff' : `Shot ${index + 1}`;
     const detail = document.createElement('span');
-    detail.textContent = `${beat.motion} · ${beat.seconds.toFixed(1)}s · ${beat.captionPos}`;
+    // The placement shown is the one the renderer settled on, not the model's hint.
+    const placed = state.timeline?.shots[index]?.captionPos ?? beat.captionPos;
+    detail.textContent = `${beat.motion} · ${beat.seconds.toFixed(1)}s · text ${placed}`;
     head.append(label, detail);
 
     const area = document.createElement('textarea');
     area.value = beat.text;
     area.rows = 1;
+    area.setAttribute('aria-label', 'Caption text');
     area.addEventListener('input', () => {
       beat.text = area.value;
       autoGrow(area);
@@ -277,7 +285,31 @@ function renderScript(usage) {
     });
 
     item.append(head, area);
+
+    if (beat.subject) {
+      const subject = document.createElement('p');
+      subject.className = 'beat-subject';
+      subject.textContent = `Framing: ${beat.subject}`;
+      item.append(subject);
+    }
+
+    if (beat.role !== 'hook') {
+      const tools = document.createElement('div');
+      tools.className = 'beat-tools';
+      const adjust = document.createElement('button');
+      adjust.type = 'button';
+      adjust.className = 'ghost small';
+      adjust.textContent = 'Adjust framing';
+      adjust.addEventListener('click', (event) => {
+        event.stopPropagation();
+        startCropping(index);
+      });
+      tools.append(adjust);
+      item.append(tools);
+    }
+
     item.addEventListener('click', () => {
+      if (state.cropping) return;
       markCurrent(index);
       seek(state.timeline.shots[index]?.start ?? 0);
     });
@@ -295,6 +327,100 @@ function markCurrent(index) {
   for (const el of $('beatList').children) {
     el.setAttribute('aria-current', String(Number(el.dataset.index) === index));
   }
+}
+
+/* ── reframing a shot ───────────────────────────────────────────────────── */
+
+/**
+ * The model reads coordinates off a grid drawn on the picture, which is good but
+ * not infallible. When a crop lands beside the thing it is about, dragging a new
+ * box over the whole painting is faster than rewriting the beat.
+ */
+function startCropping(index) {
+  const beat = state.script?.beats[index];
+  if (!beat || !state.image) return;
+  stopPlayback();
+  state.cropping = { index, draft: { ...beat.focus } };
+  markCurrent(index);
+  $('cropBar').hidden = false;
+  $('playBtn').disabled = true;
+  $('scrub').disabled = true;
+  document.querySelector('.phone').classList.add('cropping');
+  paintCropEditor();
+}
+
+function stopCropping() {
+  if (!state.cropping) return;
+  const { index } = state.cropping;
+  state.cropping = null;
+  $('cropBar').hidden = true;
+  $('playBtn').disabled = false;
+  $('scrub').disabled = false;
+  document.querySelector('.phone').classList.remove('cropping');
+  rebuildTimeline();
+  if (state.timeline) seek(state.timeline.shots[index]?.start ?? 0);
+}
+
+function paintCropEditor() {
+  if (!state.cropping) return;
+  drawCropEditor(ctx, state.image, state.cropping.draft, {
+    width: canvas.width,
+    height: canvas.height,
+  });
+}
+
+/** Pointer position in canvas pixels, whatever size the element is on screen. */
+function canvasPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+    y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+  };
+}
+
+function bindCropping() {
+  let anchor = null;
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (!state.cropping) return;
+    canvas.setPointerCapture(event.pointerId);
+    anchor = toPaintingSpace(canvasPoint(event), paintingFit(state.image, canvas.width, canvas.height));
+  });
+
+  canvas.addEventListener('pointermove', (event) => {
+    if (!state.cropping || !anchor) return;
+    const point = toPaintingSpace(canvasPoint(event), paintingFit(state.image, canvas.width, canvas.height));
+    state.cropping.draft = rectBetween(anchor, point);
+    paintCropEditor();
+  });
+
+  const finish = (event) => {
+    if (!state.cropping || !anchor) return;
+    anchor = null;
+    const beat = state.script.beats[state.cropping.index];
+    const draft = state.cropping.draft;
+    // A tap rather than a drag should not shrink the shot to nothing.
+    if (draft.w > 0.02 && draft.h > 0.02) {
+      beat.focus = draft;
+      beat.subject = beat.subject?.endsWith('(reframed by hand)')
+        ? beat.subject
+        : `${beat.subject || 'this shot'} (reframed by hand)`;
+      rebuildTimeline();
+      renderScript();
+      markCurrent(state.cropping.index);
+    }
+    canvas.releasePointerCapture?.(event.pointerId);
+  };
+
+  canvas.addEventListener('pointerup', finish);
+  canvas.addEventListener('pointercancel', finish);
+  $('cropDone').addEventListener('click', stopCropping);
+}
+
+function rectBetween(a, b) {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
 }
 
 /* ── preview and export ─────────────────────────────────────────────────── */
@@ -320,7 +446,7 @@ function rebuildTimeline() {
 }
 
 function seek(time) {
-  if (!state.timeline) return;
+  if (!state.timeline || state.cropping) return;
   state.playHead = Math.min(state.timeline.duration, Math.max(0, time));
   drawFrame(ctx, state.timeline, state.playHead, false);
   $('scrub').value = String(Math.round((state.playHead / state.timeline.duration) * 1000));
@@ -337,7 +463,7 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 
 let rafId = 0;
 function startPlayback() {
-  if (!state.timeline || state.playing) return;
+  if (!state.timeline || state.playing || state.cropping) return;
   state.playing = true;
   $('playBtn').textContent = 'Pause';
   const origin = performance.now() - state.playHead * 1000;
@@ -368,6 +494,7 @@ async function renderVideo() {
   }
 
   stopPlayback();
+  stopCropping();
   clearResult();
   setBusy(true, 'Rendering…');
   state.abort = new AbortController();
@@ -488,7 +615,9 @@ function bind() {
     el.addEventListener('input', () => {
       readForm();
       if (['res', 'fps'].includes(id)) sizeCanvas();
-      if (state.script) {
+      if (state.cropping) {
+        paintCropEditor();
+      } else if (state.script) {
         rebuildTimeline();
         seek(state.playHead);
       } else {
@@ -639,6 +768,7 @@ function bind() {
   $('menuBtn').addEventListener('click', () => $('sidebar').classList.toggle('open'));
 
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.cropping) return stopCropping();
     if (event.target.matches('input, textarea, select')) return;
     if (event.code === 'Space' && state.timeline) {
       event.preventDefault();
@@ -657,6 +787,7 @@ function setStatus(text, kind = '') {
 
 applySettingsToForm();
 bind();
+bindCropping();
 renderGrid();
 sizeCanvas();
 

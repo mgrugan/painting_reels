@@ -28,6 +28,13 @@ const BEAT = {
       type: 'string',
       description: 'The caption burned onto the screen for this beat. 8-28 words.',
     },
+    subject: {
+      type: 'string',
+      description:
+        'The one thing that must be inside the crop for this beat to work, named ' +
+        'plainly: "the glove on the carpet", "the sheet music on the piano stand". ' +
+        'Write this before choosing the coordinates.',
+    },
     focus: RECT,
     motion: {
       type: 'string',
@@ -37,7 +44,7 @@ const BEAT = {
     captionPos: { type: 'string', enum: ['top', 'center', 'lower'] },
     seconds: { type: 'number', minimum: 3, maximum: 14 },
   },
-  required: ['text', 'focus', 'motion', 'captionPos', 'seconds'],
+  required: ['text', 'subject', 'focus', 'motion', 'captionPos', 'seconds'],
   additionalProperties: false,
 };
 
@@ -105,18 +112,29 @@ detail is really in the image, do not write a beat about it. An honest, plain sc
 beats an exciting invented one; this account's whole value is that it is right.
 
 THE CAMERA
-For each beat, give the region of the painting the camera should be on, in fractions
-of the painting's width and height, origin at the top-left corner.
-- Crop tight enough that the detail actually fills the screen. For a single face,
-  hand or object, that is usually 0.12 to 0.30 of the painting's width. Only the
-  hook and the payoff should be wide.
-- The region must contain the thing you are talking about, with a little air around it.
-- The screen is 9:16, tall. A tall region fills it; a wide region will sit in the
+The image has a coordinate grid drawn over it: thin lines every 0.1, numbered
+along the top edge for x and down the left edge for y. Those numbers are an
+overlay for your benefit, not part of the painting - never describe them.
+
+For each beat, name the "subject" first, then read its box off the grid.
+- Find the subject on the grid and read its left, right, top and bottom edges
+  against the numbered lines. Give "focus" as x, y, w, h in those same units.
+  Getting this wrong is the worst failure this script can have: a beat about a
+  glove that lands on an empty patch of carpet is worse than no beat at all.
+- Sanity-check every box before you move on. Does the region from x to x+w and
+  y to y+h really contain the subject? Is it in the right half of the painting?
+  The right third from the top? If you are not certain where something is,
+  cut that beat and write about something you can locate.
+- The hook always shows the whole painting; its coordinates are set for you, so
+  write the hook line to work over the full picture.
+- Crop tight enough that the detail fills the screen. For a single face, hand or
+  object that is usually 0.12 to 0.30 of the painting's width, with a little air
+  around it. Only the hook and the payoff should be wide.
+- The screen is 9:16, tall. A tall region fills it; a wide region sits in the
   middle of the frame with black above and below, which is fine and normal.
 - "in" pushes closer, "out" pulls back, "left"/"right"/"up"/"down" drift that way,
   "hold" is nearly still. Vary them; do not push in on every beat.
-- Put the caption where it will not cover the thing you are pointing at: "top",
-  "center" or "lower".
+- "captionPos" is a hint only - the renderer places text clear of your crop.
 
 THE TEXT ITSELF
 - 8 to 28 words per beat, broken into 2-4 short lines' worth of thought.
@@ -200,6 +218,7 @@ function normalise(raw, defaultSeconds) {
     if (y + h > 1) y = Math.max(0, 1 - h);
     return {
       text: String(b?.text || '').trim(),
+      subject: String(b?.subject || '').trim(),
       focus: { x, y, w, h },
       motion: ['in', 'out', 'left', 'right', 'up', 'down', 'hold'].includes(b?.motion)
         ? b.motion
@@ -213,11 +232,16 @@ function normalise(raw, defaultSeconds) {
 
   const beats = Array.isArray(raw?.beats) ? raw.beats.map((b) => beat(b, 'center')) : [];
 
+  // The opening shot is always the whole painting. A reel that starts on a crop
+  // asks the viewer to read a detail before they know what they are looking at.
+  const hook = beat(raw?.hook, 'center');
+  hook.focus = { x: 0, y: 0, w: 1, h: 1 };
+
   return {
     reelTitle: String(raw?.reelTitle || '').trim(),
     grounding: String(raw?.grounding || '').trim(),
     beats: [
-      { ...beat(raw?.hook, 'center'), role: 'hook' },
+      { ...hook, role: 'hook' },
       ...beats.filter((b) => b.text).map((b) => ({ ...b, role: 'beat' })),
       { ...beat(raw?.payoff, 'lower'), role: 'payoff' },
     ].filter((b) => b.text),
