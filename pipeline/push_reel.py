@@ -31,7 +31,7 @@ Operational rules this obeys, the hard way:
   * The separator row goes in once per batch, only when nothing is done yet.
 """
 
-import base64, json, mimetypes, os, subprocess, sys, urllib.error, urllib.request
+import base64, datetime as dt, json, mimetypes, os, subprocess, sys, urllib.error, urllib.request
 
 SECRET = None
 
@@ -242,7 +242,8 @@ def main():
 
         print('  adding row')
         res = call(url, {'secret': SECRET, 'action': 'addRow', 'tab': tab,
-                         'caption': caption, 'folderUrl': folder_url},
+                         'caption': caption, 'folderUrl': folder_url,
+                         'dateMade': dt.date.today().isoformat()},
                    inflight=f'addRow {post} -> {tab}')
         record('posts.done', post)
         print(f'  row {res.get("row")}')

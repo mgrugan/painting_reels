@@ -72,8 +72,14 @@ const SCHEMA = {
         'title, artist and year on their own line, then 8-12 hashtags.',
     },
     hook: BEAT,
-    beats: { type: 'array', items: BEAT, minItems: 4, maxItems: 18 },
+    beats: { type: 'array', items: BEAT, minItems: 6, maxItems: 16 },
     payoff: BEAT,
+    commentPrompt: {
+      type: 'string',
+      description:
+        'The closing line asking for comments, 6-14 words, first person. ' +
+        'Shown over the whole painting.',
+    },
     grounding: {
       type: 'string',
       description:
@@ -81,7 +87,7 @@ const SCHEMA = {
         'which are plain description of what is visible, and anything you were unsure of.',
     },
   },
-  required: ['reelTitle', 'mood', 'caption', 'hook', 'beats', 'payoff', 'grounding'],
+  required: ['reelTitle', 'mood', 'caption', 'hook', 'beats', 'payoff', 'commentPrompt', 'grounding'],
   additionalProperties: false,
 };
 
@@ -96,107 +102,90 @@ Present tense, sensory, close in. Never break out to talk about the artist mid-s
 building to a thought that reframes the first line.`,
 };
 
-const SYSTEM = `You write scripts for short vertical videos about a single painting.
+const SYSTEM = `You write scripts for short vertical videos about a single painting,
+for an Instagram account whose reels reach millions of people.
 
 THE FORMAT
-The video shows one painting. The camera starts wide, then cuts between close crops
-of details, slowly pushing in or drifting across each one. A line of text sits over
-the image for the whole of each shot. There is no voice-over and no music you can
-rely on: the text carries everything.
+One painting. The camera starts on the whole picture, then cuts between close
+crops of details, pushing in or drifting across each one. A line of text sits
+over the image for the whole of each shot. No voice-over. The text is the video.
 
-THE HOOK
-The first line runs over the whole painting and decides whether anyone sees the
-rest. Write it last, once you know what the strongest thing in the reel is, and
-then put that thing first.
+THE SHAPE (this is measured from reels that went viral - follow it)
 
-It has to do one job: make someone need the next sentence. The reliable way is
-to state something concrete and true about the picture that does not resolve.
+1. HOOK, over the whole painting, 4-6 seconds.
+   It is not about the painting. It is about the act of looking, and it flatters
+   the viewer for doing it, or it tells them they are looking at the wrong thing.
+   Shapes that work:
+     "Now I understand why people spend hours staring at the same painting."
+     "Millions of people look at her smile, but he wanted you to see something else first."
+     "Most people scroll past this. The people who stop see it immediately."
+   Under 18 words. Present tense. No question marks.
 
-- 6 to 18 words. It has to be read in about two seconds.
-- Lead with a specific noun from the painting - a hand, a glove, a bird, a
-  letter - not with "this painting", "this detail", "look closely", "at first
-  glance", "what you are about to see", or any promise about how amazing it is.
-- Say something that raises a question the painting can actually answer, and do
-  not answer it. Not a riddle and not a tease: a plain fact that is strange
-  enough to need explaining. "There is a glove on the floor and only one person
-  in this room can leave" beats "This painting hides a dark secret".
-- Present tense. No question marks. No "you won't believe", no "here's why",
-  no numbers of things, no addressing the viewer as "guys".
-- Test it: if the line would work as the opening of any other reel about any
-  other painting, it is too vague. Rewrite it around something only this
-  painting contains.
+2. THREE OR FOUR FAST BEATS, 4-6 seconds each, very short text - 5 to 12 words.
+   Flat, declarative, naming what is there. Or the strongest opener of all, a
+   subversion in two beats:
+     "This looks romantic." then "It is not."
+   Do not explain yet. Just place the pieces.
 
-THE REST
-- One detail per beat, in an order that builds. Each beat should show the viewer
-  something they would not have found on their own, and each should change what
-  the previous beat meant.
-- Withhold the title and artist until the very end. That is what the closing card
-  is for.
-- The payoff must land. Prefer a documented fact that recontextualises the whole
-  picture over a poetic flourish.
+3. THE LONG MIDDLE, 9-14 seconds each, 18-38 words.
+   Now the meaning. The reliable sentence shape is an object, then what it means:
+     "Look at the hourglass on the table, because every grain is a move he can never take back."
+     "Look closely at her hands, because she is not reaching for the bank."
+   Point at something, then say the thing the viewer would not have thought of.
+   Every beat in this section must change what the previous beat meant. If a beat
+   only describes, cut it - description without meaning is what makes a reel boring.
 
-THE MOOD
-Pick the one word from the list that describes how the reel you have just
-written actually lands, and be honest about it rather than reaching for the most
-dramatic option. It chooses the music that will play under the whole thing, so a
-quiet domestic story marked "menace" will be scored wrongly.
+4. PAYOFF, 8-10 seconds. An emotional reading, never a fact.
+   "She is already grieving a man who is still alive."
+   "Because shadows stay, after people disappear."
+   This is the line the whole reel exists to earn. Write it first, then build
+   backwards to it.
 
-  elegy       a death, a loss, something already over
-  tenderness  intimacy, care, a private moment between people
-  unease      something is wrong here and the picture is not saying what
-  menace      violence, threat, cruelty, horror
-  wonder      discovery, scale, the strangeness of the world
-  melancholy  longing, regret, loneliness, time passing
-  grandeur    power, ceremony, spectacle, history being made
-  stillness   observation without heat; a quiet, level look
+5. COMMENT PROMPT, 4-5 seconds, over the whole painting.
+   "Let me know in the comments if I missed anything."
+   "I'd love to know what you noticed first."
 
-THE CAPTION
-Also write the caption that will be posted with the reel. Two or three sentences
-that work for someone reading without watching - not a transcript of the hook,
-and not "watch till the end". Then the title, artist and year on their own line.
-Then 8 to 12 hashtags, lowercase, specific to the work and its period rather
-than #art #painting #beautiful.
+Total 10 to 14 beats, 75 to 115 seconds. Do not try to make it short. A reel is
+boring when a beat says something the viewer could already see, not when it lasts
+90 seconds.
 
-TRUTH
-Everything you assert must be either (a) plainly visible in the image, or
-(b) supported by the catalogue facts you are given. If a reading is a scholarly
-interpretation rather than a fact, phrase it as one: "art historians read this as",
-"the usual reading is", "no one has settled". Never invent a date, a name, a quotation,
-a museum, a price, a diagnosis, or a biographical incident. If you are not sure a
-detail is really in the image, do not write a beat about it. An honest, plain script
-beats an exciting invented one; this account's whole value is that it is right.
+VOICE
+- First person and second person. "I", "you". Speak to one person.
+- Present tense, casual, contractions. Write like someone typing, not a museum.
+- Short lines. Three or four words per line on screen.
+- Emotional words, unhedged: heartbreaking, never, already, disappear, alone.
+- Name the artist mid-reel only when it makes the story better. Never open with
+  the title. There is no title card, so do not write "and this is called...".
+- Never: "hidden meaning", "masterpiece", "iconic", "let that sink in",
+  "you won't believe", hashtags, emoji.
+
+DRAMA AND TRUTH - the one rule that matters
+Sensationalise the framing, the pacing and the reading. Never the facts.
+"Shadows stay after people disappear" is a dramatic reading of a real gesture,
+and it is allowed. Inventing a date, a name, a quotation, a diagnosis or an
+incident is not, ever. This account's reach depends on the comments, and the
+comments correct you. Everything you assert as fact must be either plainly
+visible in the image or supported by the catalogue facts you are given. If a
+reading is contested, you can still say it - as a reading: "the usual reading
+is", "no one has settled". A true story told dramatically beats an invented one.
 
 THE CAMERA
-The image has a coordinate grid drawn over it: thin lines every 0.1, numbered
-along the top edge for x and down the left edge for y. Those numbers are an
-overlay for your benefit, not part of the painting - never describe them.
+The image has a coordinate grid over it: lines every 0.1, numbered along the top
+for x and down the left for y. The numbers are an overlay, not part of the
+painting - never describe them.
 
-For each beat, name the "subject" first, then read its box off the grid.
-- Find the subject on the grid and read its left, right, top and bottom edges
-  against the numbered lines. Give "focus" as x, y, w, h in those same units.
-  Getting this wrong is the worst failure this script can have: a beat about a
-  glove that lands on an empty patch of carpet is worse than no beat at all.
-- Sanity-check every box before you move on. Does the region from x to x+w and
-  y to y+h really contain the subject? Is it in the right half of the painting?
-  The right third from the top? If you are not certain where something is,
-  cut that beat and write about something you can locate.
-- The hook always shows the whole painting; its coordinates are set for you, so
-  write the hook line to work over the full picture.
-- Crop tight enough that the detail fills the screen. For a single face, hand or
-  object that is usually 0.12 to 0.30 of the painting's width, with a little air
-  around it. Only the hook and the payoff should be wide.
-- The screen is 9:16, tall. A tall region fills it; a wide region sits in the
-  middle of the frame with black above and below, which is fine and normal.
-- "in" pushes closer, "out" pulls back, "left"/"right"/"up"/"down" drift that way,
-  "hold" is nearly still. Vary them; do not push in on every beat.
-- "captionPos" is a hint only - the renderer places text clear of your crop.
-
-THE TEXT ITSELF
-- 8 to 28 words per beat, broken into 2-4 short lines' worth of thought.
-- No emoji, no hashtags, no "swipe", no "follow for more", no numbering.
-- Never name the painting or artist before the payoff beat.
-- Plain modern English. Do not use words like "mesmerising", "haunting", "iconic",
-  "masterpiece", or "hidden meaning".`;
+For each beat name the "subject" first, then read its box off the grid.
+- Read the subject's left, right, top and bottom edges against the numbered
+  lines and give "focus" as x, y, w, h in those units. A beat about a glove that
+  lands on empty carpet is the worst failure this script can have.
+- Check every box before moving on. Does x to x+w, y to y+h really contain it?
+  If you cannot locate something, cut that beat and write about something else.
+- Crop tight: a face, a hand or an object is usually 0.12 to 0.30 of the width.
+- The hook, the payoff and the comment prompt show the whole painting; their
+  coordinates are set for you.
+- "in" pushes closer, "out" pulls back, "left"/"right"/"up"/"down" drift,
+  "hold" is nearly still. Vary them.
+- "captionPos" is a hint only - the renderer places text clear of your crop.`;
 
 /**
  * @returns {{script: object, usage: object}}
@@ -234,10 +223,13 @@ Write the script for this painting.
 
 Voice: ${VOICES[voice] || VOICES.plain}
 
-Length: a hook, then ${beatCount} beats, then a payoff. Write the beats and the
-payoff first, then go back and write the hook out of the best of them. Aim for about ${seconds} seconds
-per beat; give shorter beats less text and longer beats more, and set "seconds" per beat
-so the text is comfortably readable at roughly 2.5 words per second with a moment to spare.
+Length: a hook, then ${beatCount} beats, then a payoff and a comment prompt.
+Write the payoff first, then the beats that earn it, then the hook last.
+
+Pace it on a curve, not a flat rate. The first three or four beats are short and
+fast - 4 to 6 seconds, 5 to 12 words. The later beats are long - 9 to 14 seconds,
+18 to 38 words. Set "seconds" so the text reads comfortably at about 2.5 words
+per second, and so the whole reel lands between 75 and 115 seconds.
 
 ${strictLine}
 
@@ -295,17 +287,55 @@ function normalise(raw, defaultSeconds) {
 
   const MOODS = ['elegy', 'tenderness', 'unease', 'menace', 'wonder', 'melancholy', 'grandeur', 'stillness'];
 
+  // The comment prompt closes the reel over the whole painting, like the hook.
+  const prompt = raw?.commentPrompt
+    ? {
+        ...beat({ text: raw.commentPrompt, seconds: 4.5, motion: 'hold' }, 'center'),
+        focus: { x: 0, y: 0, w: 1, h: 1 },
+        role: 'prompt',
+      }
+    : null;
+
   return {
     reelTitle: String(raw?.reelTitle || '').trim(),
     mood: MOODS.includes(raw?.mood) ? raw.mood : 'stillness',
     caption: String(raw?.caption || '').trim(),
     grounding: String(raw?.grounding || '').trim(),
-    beats: [
-      { ...hook, role: 'hook' },
-      ...beats.filter((b) => b.text).map((b) => ({ ...b, role: 'beat' })),
-      { ...beat(raw?.payoff, 'lower'), role: 'payoff' },
-    ].filter((b) => b.text),
+    beats: pace(
+      [
+        { ...hook, role: 'hook' },
+        ...beats.filter((b) => b.text).map((b) => ({ ...b, role: 'beat' })),
+        { ...beat(raw?.payoff, 'lower'), role: 'payoff' },
+        ...(prompt ? [prompt] : []),
+      ].filter((b) => b.text),
+    ),
   };
+}
+
+/**
+ * The measured reels open staccato and slow down: 4-5s for the first shots,
+ * 9-14s later. Asked for that curve a model mostly delivers it, but a flat
+ * script is the failure that makes a reel drag exactly where attention is won
+ * or lost. This clamps each beat into the band its position calls for, and
+ * never shortens one below what it takes to read.
+ */
+function pace(beats) {
+  const body = beats.filter((b) => b.role === 'beat');
+  const fastCount = Math.min(4, Math.max(1, Math.ceil(body.length / 3)));
+
+  return beats.map((b) => {
+    const readable = readingSeconds(b.text);
+    if (b.role === 'hook') return { ...b, seconds: clamp(readable, 4, 7) };
+    if (b.role === 'prompt') return { ...b, seconds: clamp(readable, 4, 6) };
+    if (b.role === 'payoff') return { ...b, seconds: clamp(readable, 7, 11) };
+    const [lo, hi] = body.indexOf(b) < fastCount ? [4, 7] : [8, 14];
+    return { ...b, seconds: clamp(Math.max(readable, lo), lo, Math.max(hi, readable)) };
+  });
+}
+
+/** Words at ~2.5 per second, plus a moment to take it in. */
+function readingSeconds(text) {
+  return String(text).trim().split(/\s+/).filter(Boolean).length / 2.5 + 1.2;
 }
 
 const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);

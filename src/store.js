@@ -19,7 +19,7 @@ export const DEFAULTS = {
   res: '720',
   fps: '30',
   motion: 12,
-  showTitleCard: true,
+  showTitleCard: false,
   fontFamily: '700 %spx "Helvetica Neue", Helvetica, Arial, sans-serif',
   fontSize: 38,
   showSafeZone: false,
