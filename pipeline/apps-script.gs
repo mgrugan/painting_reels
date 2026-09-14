@@ -1,6 +1,6 @@
 const ROOT_FOLDER_ID = '1tiX0WO6Lxq7ifguixI2tLi9YF5-PYcqh';
 const SPREADSHEET_ID = '1OBdG1FK9s1ahg83bb_Lq0M33hLIzAv2vMgTPgf9lTi0';
-const SECRET = '1f48c4ca555c4ae9';
+const SECRET = 'PASTE_SECRET_HERE';  // the value Claude gave you in chat — never commit it
 
 function doPost(e) {
   let req;

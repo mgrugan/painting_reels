@@ -6,7 +6,10 @@ One reel is one "post": a Drive subfolder holding the video, plus a row in the
 named tab with the caption and a link to that folder.
 
 Usage:
-    python3 push_reel.py <WEBHOOK_URL> <TAB> [<N>]
+    python3 push_reel.py <WEBHOOK_URL|-> <TAB> [<N>]
+
+`-` uses REEL_WEBHOOK_URL from pipeline/.env. The shared secret is read from
+REEL_WEBHOOK_SECRET there too — never from this file, which is public.
 
 Reels are read from ./outbox — one folder per reel, each holding a video file
 and caption.txt:
@@ -28,6 +31,8 @@ Operational rules this obeys, the hard way:
 """
 
 import base64, json, mimetypes, os, subprocess, sys, urllib.error, urllib.request
+
+SECRET = None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTBOX = os.path.join(HERE, 'outbox')
@@ -137,7 +142,11 @@ def find_video(folder):
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
+    global SECRET
+    SECRET, configured_url = load_config()
     url, tab = sys.argv[1], sys.argv[2]
+    if url == '-' and configured_url:
+        url = configured_url
     limit = int(sys.argv[3]) if len(sys.argv) > 3 else 7
 
     if not os.path.isdir(OUTBOX):
@@ -205,7 +214,30 @@ def main():
     print(f'\n{len(posts) - remaining} of {len(posts)} posts done, {remaining} left')
 
 
-SECRET = '1f48c4ca555c4ae9'
+def load_config():
+    """
+    The shared secret and the webhook URL are credentials, so they live in
+    pipeline/.env — which is gitignored — or in the environment. They are
+    deliberately not in this file: the repository is public.
+    """
+    env = os.path.join(HERE, '.env')
+    values = dict(os.environ)
+    if os.path.exists(env):
+        with open(env) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, _, value = line.partition('=')
+                values.setdefault(key.strip(), value.strip())
+    secret = values.get('REEL_WEBHOOK_SECRET')
+    if not secret:
+        sys.exit(
+            'No REEL_WEBHOOK_SECRET. Put it in pipeline/.env as\n'
+            '  REEL_WEBHOOK_SECRET=...\n'
+            'or export it. It must match SECRET in the Apps Script.')
+    return secret, values.get('REEL_WEBHOOK_URL')
+
 
 if __name__ == '__main__':
     main()

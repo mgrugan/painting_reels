@@ -205,6 +205,11 @@ Architecture, which is not negotiable for good reasons: the Drive connector is
 too slow for media and cannot write sheet cells, so everything goes through an
 Apps Script web app you deploy once, driven by a local Python pusher.
 
+**Credentials.** The shared secret and the `/exec` URL live in `pipeline/.env`,
+which is gitignored — this repository is public, so neither belongs in a tracked
+file. Copy `pipeline/.env.example` and fill it in; the secret must match `SECRET`
+in the deployed script.
+
 **Setup, once.** Create a **standalone** script at <https://script.new> — not
 Extensions → Apps Script, which breaks when several Google accounts are signed
 in. Paste `pipeline/apps-script.gs`, then Deploy → New deployment → Web app,
