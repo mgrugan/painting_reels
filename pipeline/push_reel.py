@@ -78,8 +78,20 @@ def save_map(name, data):
         json.dump(data, f, indent=1)
 
 
-def call(url, payload):
-    """One attempt. Never called twice for the same logical action."""
+def call(url, payload, inflight=None):
+    """
+    One attempt. Never called twice for the same logical action.
+
+    Before the request goes out, what it is gets written to .state/inflight.
+    Apps Script routinely executes a request whose response never comes back —
+    a 404 on the redirect, an HTML error page, a dead socket — so after a crash
+    the question is never "did it fail" but "which call was in the air, and did
+    it land". The marker answers the first half; only Drive can answer the
+    second. The file is removed once a response is in hand.
+    """
+    if inflight:
+        with open(state_path('inflight'), 'w') as f:
+            f.write(inflight + '\n')
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
         url, data=body, headers={'Content-Type': 'application/json'}, method='POST')
@@ -91,6 +103,11 @@ def call(url, payload):
         raise RuntimeError('non-JSON response (the call may still have run): ' + raw[:300])
     if out.get('error'):
         raise RuntimeError('webhook error: ' + out['error'])
+    if inflight:
+        try:
+            os.remove(state_path('inflight'))
+        except FileNotFoundError:
+            pass
     return out
 
 
@@ -161,6 +178,15 @@ def main():
     if not os.path.isdir(OUTBOX):
         sys.exit(f'no outbox at {OUTBOX}')
 
+    if os.path.exists(state_path('inflight')):
+        with open(state_path('inflight')) as f:
+            stuck = f.read().strip()
+        sys.exit(
+            f'A previous run died with this call in the air:\n    {stuck}\n\n'
+            'It may well have executed on the server. Check Drive and the sheet, '
+            'then delete pipeline/.state/inflight to continue — and if it did land, '
+            'record it in uploads.done / folders.json first so it is not sent twice.')
+
     posts = sorted(d for d in os.listdir(OUTBOX) if os.path.isdir(os.path.join(OUTBOX, d)))
     done_posts = load_lines('posts.done')
     done_uploads = load_lines('uploads.done')
@@ -169,7 +195,7 @@ def main():
     if not done_posts and not load_lines('separator.done'):
         print('separator row')
         call(url, {'secret': SECRET, 'action': 'addRow', 'tab': tab,
-                   'caption': '-----', 'folderUrl': ''})
+                   'caption': '-----', 'folderUrl': ''}, inflight=f'addRow separator {tab}')
         record('separator.done', tab)
 
     todo = [p for p in posts if p not in done_posts][:limit]
@@ -203,7 +229,8 @@ def main():
             mime = mimetypes.guess_type(ready)[0] or 'video/mp4'
             print(f'  uploading {os.path.basename(ready)} ({len(data) / 1e6:.1f} MB base64)')
             res = call(url, {'secret': SECRET, 'action': 'upload', 'post': post,
-                             'filename': f'{post}.mp4', 'mime': mime, 'data': data})
+                             'filename': f'{post}.mp4', 'mime': mime, 'data': data},
+                       inflight=f'upload {post}/{post}.mp4')
             record('uploads.done', key)
             folder_urls[post] = res['folderUrl']
             save_map('folders.json', folder_urls)
@@ -215,7 +242,8 @@ def main():
 
         print('  adding row')
         res = call(url, {'secret': SECRET, 'action': 'addRow', 'tab': tab,
-                         'caption': caption, 'folderUrl': folder_url})
+                         'caption': caption, 'folderUrl': folder_url},
+                   inflight=f'addRow {post} -> {tab}')
         record('posts.done', post)
         print(f'  row {res.get("row")}')
 
