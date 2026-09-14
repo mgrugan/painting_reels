@@ -218,6 +218,16 @@ Google account"). Keep the `/exec` URL. If a later edit seems to have no effect
 you have probably made a second deployment — edit the existing one and publish a
 **New version**.
 
+**Check it.** Opening the `/exec` URL in a browser should return
+`{"ok":true,"service":"painting-reels",...}`. Anything else — a sign-in page, an
+"Access Denied" screen, a 403 — means the deployment is not published to
+**Anyone**, which is the one setting that actually breaks this. Then confirm the
+secret matches, writing nothing:
+
+```sh
+python3 pipeline/push_reel.py - --ping
+```
+
 **Per reel.** Drop a folder into `pipeline/outbox/` holding the video and
 `caption.txt`, then:
 

@@ -8,6 +8,7 @@ named tab with the caption and a link to that folder.
 Usage:
     python3 push_reel.py <WEBHOOK_URL|-> <TAB> [<N>]
 
+Pass `--ping` as the tab to check the deployment without writing anything.
 `-` uses REEL_WEBHOOK_URL from pipeline/.env. The shared secret is read from
 REEL_WEBHOOK_SECRET there too — never from this file, which is public.
 
@@ -139,6 +140,11 @@ def find_video(folder):
     return None
 
 
+def ping(url):
+    """Cheap proof that the deployment is public and the secret matches."""
+    print(call(url, {'secret': SECRET, 'action': 'ping'}))
+
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
@@ -148,6 +154,9 @@ def main():
     if url == '-' and configured_url:
         url = configured_url
     limit = int(sys.argv[3]) if len(sys.argv) > 3 else 7
+
+    if tab == '--ping':
+        return ping(url)
 
     if not os.path.isdir(OUTBOX):
         sys.exit(f'no outbox at {OUTBOX}')

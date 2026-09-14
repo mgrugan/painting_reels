@@ -2,11 +2,24 @@ const ROOT_FOLDER_ID = '1tiX0WO6Lxq7ifguixI2tLi9YF5-PYcqh';
 const SPREADSHEET_ID = '1OBdG1FK9s1ahg83bb_Lq0M33hLIzAv2vMgTPgf9lTi0';
 const SECRET = 'PASTE_SECRET_HERE';  // the value Claude gave you in chat — never commit it
 
+/**
+ * Open the /exec URL in a browser, or fetch it, to confirm the deployment is
+ * reachable. Anything other than this JSON means the web app is not published
+ * to "Anyone" — which is the failure this exists to make obvious. It touches
+ * nothing and needs no secret.
+ */
+function doGet() {
+  return json({ ok: true, service: 'painting-reels', actions: ['ping', 'upload', 'addRow', 'deleteByLink'] });
+}
+
 function doPost(e) {
   let req;
   try { req = JSON.parse(e.postData.contents); }
   catch (err) { return json({ error: 'bad request' }); }
   if (req.secret !== SECRET) return json({ error: 'unauthorized' });
+
+  // Confirms the secret matches without creating a file or a row.
+  if (req.action === 'ping') return json({ ok: true, pong: true });
 
   if (req.action === 'upload') {
     const root = DriveApp.getFolderById(ROOT_FOLDER_ID);
