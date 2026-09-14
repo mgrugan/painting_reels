@@ -71,6 +71,40 @@ off the bottom of a 1080 × 1920 frame, which is where Instagram and TikTok lay
 their own controls. **Show safe zone in the preview** draws the boundary while
 you work; it is never rendered into the file.
 
+## The score
+
+Every script comes back with a **mood** — one of elegy, tenderness, unease,
+menace, wonder, melancholy, grandeur, stillness — judged on the reel as written
+rather than on the painting in the abstract. That mood picks the music.
+
+| Mood | Piece |
+|---|---|
+| elegy | Satie, Gnossienne No. 5 |
+| tenderness / stillness | Bach, Goldberg Variations — Aria |
+| unease | Satie, Gnossienne No. 4 |
+| menace | Bach, Toccata and Fugue in D minor |
+| wonder | Debussy, Clair de lune |
+| melancholy | Satie, Gnossienne No. 3 |
+| grandeur | Debussy, Clair de Lune — brass, US Air Force Band of Flight |
+
+Six recordings across eight moods, and that is the whole library, because the
+binding constraint is not the music but the *recording*. Classical compositions
+are almost all out of copyright; classical recordings mostly are not. Everything
+here is public domain or CC0, served from Wikimedia with open CORS so the page
+can fetch it, and linked as the MP3 transcode because Safari will not decode
+Ogg. Tracks loop to cover the reel and fade out at the end.
+
+**Score** in the sidebar overrides any of this: pick a specific piece, load your
+own file, or turn it off. The music is only fetched when you render, so changing
+your mind costs nothing. Adding a track is a row in `src/music.js`.
+
+## The caption
+
+The same call also writes the Instagram caption — a few sentences that work for
+someone reading without watching, the title/artist/year, and 8–12 hashtags. It
+is editable in the script panel, with **Copy** and **Save .txt**. That .txt is
+what the upload pipeline reads.
+
 ## Cost
 
 One reel is one API call with one small image, so it is cheap. At the default
@@ -163,6 +197,45 @@ painting being public domain does not make every *photograph* of it free in ever
 jurisdiction; the Wikimedia files used here are ones Commons hosts as
 faithful reproductions of two-dimensional public-domain works.
 
+## Publishing pipeline
+
+`pipeline/` pushes finished reels to Google Drive and logs them in a sheet.
+
+Architecture, which is not negotiable for good reasons: the Drive connector is
+too slow for media and cannot write sheet cells, so everything goes through an
+Apps Script web app you deploy once, driven by a local Python pusher.
+
+**Setup, once.** Create a **standalone** script at <https://script.new> — not
+Extensions → Apps Script, which breaks when several Google accounts are signed
+in. Paste `pipeline/apps-script.gs`, then Deploy → New deployment → Web app,
+Execute as **Me**, Who has access **Anyone** (exactly that, not "Anyone with a
+Google account"). Keep the `/exec` URL. If a later edit seems to have no effect
+you have probably made a second deployment — edit the existing one and publish a
+**New version**.
+
+**Per reel.** Drop a folder into `pipeline/outbox/` holding the video and
+`caption.txt`, then:
+
+```sh
+timeout 165 python3 -u pipeline/push_reel.py <EXEC_URL> <TAB> 7
+```
+
+Repeat until it reports nothing left. Notes on why it is shaped this way:
+
+- **Nothing is ever retried.** Apps Script often runs a request server-side even
+  when the response never arrives, so a retry means a duplicate file and a
+  duplicate row. One attempt, 300s timeout, then stop and look.
+- **Everything is recorded before the next step** in `pipeline/.state/`, and each
+  reel's folder URL is saved the moment it is known — so a rerun skips finished
+  work, and a reel whose video landed but whose row did not gets its row from the
+  saved URL.
+- **Runs are chunked** (7 reels a go) because shell commands time out around
+  three minutes. The resume tracking makes an interruption harmless.
+- **Videos are transcoded before upload.** A MediaRecorder capture is 50–100MB,
+  which Apps Script cannot take in one request; re-encoding to H.264 at CRF 26
+  brings a 90-second reel to 2–5MB and is also what makes it postable to
+  Instagram at all.
+
 ## Files
 
 | File | What it does |
@@ -175,6 +248,9 @@ faithful reproductions of two-dimensional public-domain works.
 | `src/renderer.js` | The camera, the captions, the title card |
 | `src/recorder.js` | Canvas + audio → video file |
 | `src/webm.js` | Writes a duration into `MediaRecorder` WebM output |
+| `src/music.js` | The public-domain score library and the mood mapping |
+| `pipeline/apps-script.gs` | The Drive + Sheets web app you deploy once |
+| `pipeline/push_reel.py` | Uploads reels and logs them, resumably |
 | `src/images.js` | Loading, and the downscaled copy sent to the model |
 | `src/store.js` | `localStorage` for settings and the optional key |
 

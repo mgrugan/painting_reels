@@ -9,6 +9,7 @@ import { writeScript, estimateTokens } from './script.js';
 import { loadImage, toModelImage, readFileAsDataUrl } from './images.js';
 import { buildTimeline, drawFrame, drawCropEditor, drawSafeZone, paintingFit, toPaintingSpace } from './renderer.js';
 import { record, decodeAudioFile, downloadBlob, isSupported, outputFormat } from './recorder.js';
+import { TRACKS, MOOD_LABELS, loadTrack, trackById, trackForMood } from './music.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,6 +23,7 @@ const state = {
   script: null,
   timeline: null,
   audioBuffer: null,
+  loadedTrackId: null,
   result: null,
   cropping: null,
   lastUsage: null,
@@ -40,7 +42,8 @@ const CONTROLS = {
   model: 'value', effort: 'value', voice: 'value', beats: 'number', secs: 'number',
   strictFacts: 'checked', res: 'value', fps: 'value', motion: 'number',
   showTitleCard: 'checked', fontFamily: 'value', fontSize: 'number', capPos: 'value',
-  showSafeZone: 'checked', watermark: 'value', musicVol: 'number',
+  showSafeZone: 'checked', watermark: 'value', scoreMode: 'value', trackPick: 'value',
+  musicVol: 'number',
 };
 
 function applySettingsToForm() {
@@ -247,10 +250,15 @@ function renderScript(usage = state.lastUsage) {
     usage?.output_tokens || 0,
   );
   const parts = [`${script.beats.length} shots`];
+  if (script.mood) parts.push(MOOD_LABELS[script.mood]?.split(' —')[0] || script.mood);
   if (usage?.input_tokens) parts.push(`${usage.input_tokens} in / ${usage.output_tokens} out`);
   if (cost != null) parts.push(cost < 0.01 ? 'under 1¢' : `${(cost * 100).toFixed(1)}¢`);
   $('scriptMeta').textContent = parts.join(' · ');
   $('sourcesNote').textContent = script.grounding ? `Grounding: ${script.grounding}` : '';
+
+  $('captionBox').hidden = !script.caption;
+  $('captionText').value = script.caption || '';
+  refreshScoreUi();
 
   const list = $('beatList');
   list.textContent = '';
@@ -327,6 +335,81 @@ function autoGrow(area) {
 function markCurrent(index) {
   for (const el of $('beatList').children) {
     el.setAttribute('aria-current', String(Number(el.dataset.index) === index));
+  }
+}
+
+/* ── the score ──────────────────────────────────────────────────────────── */
+
+function fillTrackPicker() {
+  const select = $('trackPick');
+  select.textContent = '';
+  for (const track of TRACKS) {
+    const option = document.createElement('option');
+    option.value = track.id;
+    option.textContent = `${track.composer} — ${track.title}`;
+    select.append(option);
+  }
+  select.value = state.settings.trackPick || TRACKS[0].id;
+}
+
+/** Which piece this reel will be scored with, or null for silence. */
+function chosenTrack() {
+  const mode = state.settings.scoreMode;
+  if (mode === 'off' || mode === 'file') return null;
+  if (mode === 'pick') return trackById(state.settings.trackPick) || TRACKS[0];
+  return state.script ? trackForMood(state.script.mood) : null;
+}
+
+function refreshScoreUi() {
+  const mode = state.settings.scoreMode;
+  $('trackField').hidden = mode !== 'pick';
+  $('musicFile').hidden = mode !== 'file';
+
+  if (mode === 'off') {
+    $('musicNote').textContent = 'No music. The reel renders silent.';
+    return;
+  }
+  if (mode === 'file') {
+    $('musicNote').textContent = state.audioBuffer
+      ? $('musicNote').textContent
+      : 'Choose an audio file. It stays on your machine.';
+    return;
+  }
+  const track = chosenTrack();
+  if (!track) {
+    $('musicNote').textContent = 'Generate a reel and its mood will choose the music.';
+    return;
+  }
+  const because =
+    mode === 'auto' && state.script
+      ? `Mood: ${state.script.mood}. `
+      : '';
+  $('musicNote').textContent = `${because}${track.composer} — ${track.title}. ${track.licence}.`;
+}
+
+/**
+ * Fetches the scoring track if it is not already decoded. Called before a
+ * render rather than on selection, so choosing a mood costs nothing until the
+ * reel is actually being made.
+ */
+async function ensureScore(signal) {
+  if (state.settings.scoreMode === 'off') return null;
+  if (state.settings.scoreMode === 'file') return state.audioBuffer;
+
+  const track = chosenTrack();
+  if (!track) return null;
+  if (state.loadedTrackId === track.id && state.audioBuffer) return state.audioBuffer;
+
+  $('musicNote').textContent = `Fetching ${track.title}…`;
+  try {
+    state.audioBuffer = await loadTrack(track, signal);
+    state.loadedTrackId = track.id;
+    refreshScoreUi();
+    return state.audioBuffer;
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err;
+    $('musicNote').textContent = `Could not load ${track.title} — rendering silent.`;
+    return null;
   }
 }
 
@@ -505,11 +588,12 @@ async function renderVideo() {
   $('renderHint').hidden = false;
 
   try {
+    const audioBuffer = await ensureScore(state.abort.signal);
     const { blob, extension } = await record({
       canvas,
       timeline: state.timeline,
       fps: Number(state.settings.fps),
-      audioBuffer: state.audioBuffer,
+      audioBuffer,
       audioGain: state.settings.musicVol / 100,
       signal: state.abort.signal,
       onProgress: (p) => {
@@ -727,6 +811,36 @@ function bind() {
     }
   });
 
+  $('scoreMode').addEventListener('change', () => {
+    state.audioBuffer = null;
+    state.loadedTrackId = null;
+    refreshScoreUi();
+  });
+
+  $('trackPick').addEventListener('change', () => {
+    state.audioBuffer = null;
+    state.loadedTrackId = null;
+    refreshScoreUi();
+  });
+
+  $('copyCaption').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('captionText').value);
+      toast('Caption copied.');
+    } catch {
+      toast('Clipboard blocked by the browser.', true);
+    }
+  });
+
+  $('saveCaption').addEventListener('click', () => {
+    const name = slug(state.script?.reelTitle || state.selected?.title || 'caption');
+    downloadBlob(new Blob([$('captionText').value], { type: 'text/plain' }), `${name}.caption.txt`);
+  });
+
+  $('captionText').addEventListener('input', (event) => {
+    if (state.script) state.script.caption = event.target.value;
+  });
+
   $('musicFile').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -736,6 +850,7 @@ function bind() {
     }
     try {
       state.audioBuffer = await decodeAudioFile(file);
+      state.loadedTrackId = null;
       $('musicNote').textContent = `${file.name} — ${fmt(state.audioBuffer.duration)}, looped to fit.`;
     } catch {
       state.audioBuffer = null;
@@ -787,9 +902,11 @@ function setStatus(text, kind = '') {
 
 /* ── boot ───────────────────────────────────────────────────────────────── */
 
+fillTrackPicker();
 applySettingsToForm();
 bind();
 bindCropping();
+refreshScoreUi();
 renderGrid();
 sizeCanvas();
 

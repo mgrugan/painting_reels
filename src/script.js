@@ -57,6 +57,20 @@ const SCHEMA = {
       type: 'string',
       description: 'A short internal label for this reel. Not shown on screen.',
     },
+    mood: {
+      type: 'string',
+      enum: ['elegy', 'tenderness', 'unease', 'menace', 'wonder', 'melancholy', 'grandeur', 'stillness'],
+      description:
+        'The feeling the finished reel should leave, used to pick the music. ' +
+        'Judge the reel you have written, not the painting in the abstract.',
+    },
+    caption: {
+      type: 'string',
+      description:
+        'The Instagram caption to post with this reel. Two or three sentences ' +
+        'that stand on their own for someone who has not watched it, then the ' +
+        'title, artist and year on their own line, then 8-12 hashtags.',
+    },
     hook: BEAT,
     beats: { type: 'array', items: BEAT, minItems: 4, maxItems: 18 },
     payoff: BEAT,
@@ -67,7 +81,7 @@ const SCHEMA = {
         'which are plain description of what is visible, and anything you were unsure of.',
     },
   },
-  required: ['reelTitle', 'hook', 'beats', 'payoff', 'grounding'],
+  required: ['reelTitle', 'mood', 'caption', 'hook', 'beats', 'payoff', 'grounding'],
   additionalProperties: false,
 };
 
@@ -120,6 +134,28 @@ THE REST
   is for.
 - The payoff must land. Prefer a documented fact that recontextualises the whole
   picture over a poetic flourish.
+
+THE MOOD
+Pick the one word from the list that describes how the reel you have just
+written actually lands, and be honest about it rather than reaching for the most
+dramatic option. It chooses the music that will play under the whole thing, so a
+quiet domestic story marked "menace" will be scored wrongly.
+
+  elegy       a death, a loss, something already over
+  tenderness  intimacy, care, a private moment between people
+  unease      something is wrong here and the picture is not saying what
+  menace      violence, threat, cruelty, horror
+  wonder      discovery, scale, the strangeness of the world
+  melancholy  longing, regret, loneliness, time passing
+  grandeur    power, ceremony, spectacle, history being made
+  stillness   observation without heat; a quiet, level look
+
+THE CAPTION
+Also write the caption that will be posted with the reel. Two or three sentences
+that work for someone reading without watching - not a transcript of the hook,
+and not "watch till the end". Then the title, artist and year on their own line.
+Then 8 to 12 hashtags, lowercase, specific to the work and its period rather
+than #art #painting #beautiful.
 
 TRUTH
 Everything you assert must be either (a) plainly visible in the image, or
@@ -257,8 +293,12 @@ function normalise(raw, defaultSeconds) {
   const hook = beat(raw?.hook, 'center');
   hook.focus = { x: 0, y: 0, w: 1, h: 1 };
 
+  const MOODS = ['elegy', 'tenderness', 'unease', 'menace', 'wonder', 'melancholy', 'grandeur', 'stillness'];
+
   return {
     reelTitle: String(raw?.reelTitle || '').trim(),
+    mood: MOODS.includes(raw?.mood) ? raw.mood : 'stillness',
+    caption: String(raw?.caption || '').trim(),
     grounding: String(raw?.grounding || '').trim(),
     beats: [
       { ...hook, role: 'hook' },

@@ -24,7 +24,9 @@ export const DEFAULTS = {
   fontSize: 38,
   showSafeZone: false,
   capPos: 'auto',
-  watermark: '@explainingpaintings',
+  watermark: '@arts_help',
+  scoreMode: 'auto',
+  trackPick: 'goldberg-aria',
   musicVol: 35,
 };
 

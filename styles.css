@@ -404,6 +404,23 @@ a.save:hover { opacity: .86; }
 }
 .beat textarea:focus { box-shadow: none; }
 
+/* ── caption ─────────────────────────────────────────────── */
+
+.caption-box {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+  background: var(--bg);
+  margin: 12px 0;
+}
+.caption-box .section-head { margin-bottom: 8px; }
+.caption-box textarea {
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 90px;
+}
+
 /* ── toast ───────────────────────────────────────────────── */
 
 .toast {

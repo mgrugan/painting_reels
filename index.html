@@ -143,14 +143,27 @@
         </div>
         <div class="field">
           <label for="watermark">Watermark</label>
-          <input id="watermark" type="text" placeholder="@explainingpaintings" />
+          <input id="watermark" type="text" placeholder="@arts_help" />
         </div>
       </section>
 
       <section class="panel">
-        <h2>Audio</h2>
-        <input type="file" id="musicFile" accept="audio/*" />
-        <p class="note" id="musicNote">Optional. The file stays on your machine.</p>
+        <h2>Score</h2>
+        <div class="field">
+          <label for="scoreMode">Music</label>
+          <select id="scoreMode">
+            <option value="auto">Match the reel's mood</option>
+            <option value="pick">Choose a piece…</option>
+            <option value="file">My own file</option>
+            <option value="off">None</option>
+          </select>
+        </div>
+        <div class="field" id="trackField" hidden>
+          <label for="trackPick">Piece</label>
+          <select id="trackPick"></select>
+        </div>
+        <input type="file" id="musicFile" accept="audio/*" hidden />
+        <p class="note" id="musicNote">Public-domain recordings, fetched when you render.</p>
         <div class="field">
           <label for="musicVol">Volume <span class="hint" id="musicVolVal">35%</span></label>
           <input type="range" id="musicVol" min="0" max="100" value="35" />
@@ -236,6 +249,16 @@
             </div>
           </div>
           <p class="muted small" id="scriptMeta"></p>
+          <div class="caption-box" id="captionBox" hidden>
+            <div class="section-head">
+              <h2>Caption</h2>
+              <div class="row">
+                <button id="copyCaption" class="ghost small" type="button">Copy</button>
+                <button id="saveCaption" class="ghost small" type="button">Save .txt</button>
+              </div>
+            </div>
+            <textarea id="captionText" rows="5"></textarea>
+          </div>
           <ol class="beats" id="beatList"></ol>
           <p class="note" id="sourcesNote"></p>
         </div>
