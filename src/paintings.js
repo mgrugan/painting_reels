@@ -250,6 +250,24 @@ export const PAINTINGS = [
     "page": "https://en.wikipedia.org/wiki/Liberty_Leading_the_People"
   },
   {
+    "id": "mona-lisa-leonardo-da-vinci",
+    "title": "Mona Lisa",
+    "artist": "Leonardo da Vinci",
+    "year": "c. 1503-19",
+    "museum": "Musee du Louvre, Paris",
+    "tags": [
+      "renaissance",
+      "portrait",
+      "sfumato",
+      "louvre"
+    ],
+    "notes": "Almost certainly Lisa Gherardini, wife of the Florentine silk merchant Francesco del Giocondo. She wears no jewellery, unusual for a wealthy sitter of the period. Leonardo built the modelling with sfumato, layering translucent glazes so that no edge is sharp; the corners of the mouth and eyes are deliberately left indistinct. The landscape behind her does not line up: the horizon on the left sits lower than the one on the right. He kept the painting with him for the rest of his life and never delivered it. It was stolen from the Louvre in 1911 by Vincenzo Peruggia and recovered two years later.",
+    "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/1280px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg",
+    "w": 1280,
+    "h": 1908,
+    "page": "https://en.wikipedia.org/wiki/Mona_Lisa"
+  },
+  {
     "id": "napoleon-crossing-the-alps-jacques-louis-david",
     "title": "Napoleon Crossing the Alps",
     "artist": "Jacques-Louis David",
@@ -930,6 +948,25 @@ export const PAINTINGS = [
     "w": 1280,
     "h": 1589,
     "page": "https://en.wikipedia.org/wiki/The_Scream"
+  },
+  {
+    "id": "the-shadow-edmund-blair-leighton",
+    "title": "The Shadow",
+    "artist": "Edmund Blair Leighton",
+    "year": "1909",
+    "museum": "Private collection",
+    "tags": [
+      "victorian",
+      "romance",
+      "war",
+      "departure",
+      "shadow"
+    ],
+    "notes": "A knight in mail stands against a sunlit castle wall, about to leave. A woman in white reaches past his face and traces the outline of his shadow on the stone. A ship waits in the bay behind them. Leighton specialised in meticulously researched medieval and Regency scenes; the armour and dress are period-accurate studio props.",
+    "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/Edmund_Blair_Leighton_-_The_Shadow.jpg/1280px-Edmund_Blair_Leighton_-_The_Shadow.jpg",
+    "w": 1280,
+    "h": 1962,
+    "page": "https://en.wikipedia.org/wiki/The_Shadow_(painting)"
   },
   {
     "id": "the-slave-ship-j-m-w-turner",
